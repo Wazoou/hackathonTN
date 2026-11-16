@@ -1,0 +1,62 @@
+# Pyro-Watch : docker compose up --build  ->  dashboard sur http://localhost:8501
+# Caméras : images réelles du dataset pyro-sdis, coordonnées approximatives (à ajuster).
+
+x-camera: &camera
+  build: ./camera
+  environment: &camera-env
+    API_URL: http://api:8000
+    INTERVAL: "5"
+    DETECTOR: dummy          # phase 2 : yolo (build avec INSTALL_YOLO=true)
+  volumes:
+    - ./data/samples:/samples:ro,z   # ",z" : obligatoire avec SELinux (Fedora)
+  depends_on: [api]
+  restart: unless-stopped
+
+services:
+  api:
+    build: ./api
+    ports: ["8000:8000"]     # doc interactive : http://localhost:8000/docs
+    volumes:
+      - ./data/api:/data:z
+    environment:
+      CONF_THRESHOLD: "0.35"
+      MIN_CONSECUTIVE: "2"
+    restart: unless-stopped
+
+  dashboard:
+    build: ./dashboard
+    ports: ["8501:8501"]
+    environment:
+      API_URL: http://api:8000
+    depends_on: [api]
+    restart: unless-stopped
+
+  cam-1:
+    <<: *camera
+    environment:
+      <<: *camera-env
+      CAMERA_ID: cam-1
+      CAMERA_NAME: Brison 110° (SDIS 07)
+      CAMERA_LAT: "44.53"
+      CAMERA_LON: "4.22"
+      SOURCE: /samples/cam-1     # python ml/pyro_sdis.py samples --out data/samples
+
+  cam-2:
+    <<: *camera
+    environment:
+      <<: *camera-env
+      CAMERA_ID: cam-2
+      CAMERA_NAME: Ferion 142° (Force 06)
+      CAMERA_LAT: "43.85"
+      CAMERA_LON: "7.20"
+      SOURCE: /samples/cam-2
+
+  cam-3:
+    <<: *camera
+    environment:
+      <<: *camera-env
+      CAMERA_ID: cam-3
+      CAMERA_NAME: Caméra de test (synthétique)
+      CAMERA_LAT: "44.90"
+      CAMERA_LON: "4.40"
+      SOURCE: synthetic          # ou une URL de webcam publique / un .mp4 / rtsp://...

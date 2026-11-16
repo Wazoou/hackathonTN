@@ -1,0 +1,65 @@
+# 🔥 Pyro-Watch
+
+Détection précoce de feux de forêt à partir de caméras : hackathon Open Data University,
+défi « Prévenir et détecter les feux de forêt » (Pyronear × Latitudes).
+
+Voir **[ROADMAP.md](ROADMAP.md)** pour le plan de la semaine et la répartition des tâches.
+
+## Architecture
+
+```
+ caméras (cam-1..3)                       api (FastAPI + SQLite)            dashboard (Streamlit)
+ ┌──────────────────────┐  POST image    ┌──────────────────────┐   GET    ┌──────────────────────┐
+ │ source -> détecteur  │ + détections   │ caméras, détections, │ <─────── │ carte, flux, alertes │
+ │ (dummy | yolo)       │ ─────────────> │ logique d'alerte     │ ───────> │ confirmer / faux pos.│
+ └──────────────────────┘                └──────────────────────┘  PATCH   └──────────────────────┘
+```
+
+| Dossier | Rôle |
+|---|---|
+| `api/` | Reçoit les images et les détections, crée une alerte après `MIN_CONSECUTIVE` images avec une confiance ≥ `CONF_THRESHOLD`. Doc interactive : http://localhost:8000/docs |
+| `camera/` | Agent caméra (équivalent simplifié de `pyro-engine`). Sources : `synthetic`, un dossier d'images, une vidéo `.mp4`, un flux `rtsp://`, ou l'URL d'une image de webcam publique |
+| `dashboard/` | Interface des pompiers : http://localhost:8501 |
+| `ml/` | Téléchargement du dataset `pyro-sdis`, évaluation et fine-tuning YOLO |
+
+## Démarrage
+
+Prérequis : Docker avec le plugin compose (Fedora : `sudo dnf install docker-compose`).
+
+```bash
+# 1. Images de démo : vraies séquences de caméras SDIS (~120 Mo)
+python3 -m venv .venv && .venv/bin/pip install pyarrow requests
+.venv/bin/python ml/pyro_sdis.py samples --out data/samples --cameras 3
+
+# 2. Lancer la stack
+docker compose up --build
+```
+
+Ouvrir http://localhost:8501. Sans l'étape 1, les caméras passent en images synthétiques.
+
+> En phase 1, le détecteur est **factice** (`DETECTOR=dummy`). Il génère des « épisodes » de fumée
+> aléatoires pour tester toute la chaîne ; ses boîtes ne correspondent pas à de la vraie fumée.
+
+### Passer au vrai modèle (phase 2)
+
+```bash
+docker compose build --build-arg INSTALL_YOLO=true   # installe torch en version CPU (~2 Go)
+```
+
+Puis, dans `docker-compose.yml` : `DETECTOR: yolo`. Par défaut, le modèle utilisé est
+`hf://pyronear/yolo11s_sensitive-detector/best.pt` ; on peut en mettre un autre via
+`YOLO_WEIGHTS`, en chemin local ou en `hf://`.
+
+### Développement sans Docker
+
+```bash
+cd api && DATA_DIR=../data/api uvicorn app.main:app --reload
+cd camera && SOURCE=../data/samples/cam-1 INTERVAL=2 python camera.py
+cd dashboard && streamlit run app.py
+```
+
+## Données et modèles
+
+- Dataset : [pyronear/pyro-sdis](https://huggingface.co/datasets/pyronear/pyro-sdis), 12 378 images, format YOLO, licence Apache 2.0
+- Modèles : [huggingface.co/pyronear](https://huggingface.co/pyronear)
+- Code Pyronear : [github.com/pyronear](https://github.com/pyronear) (`pyro-engine`, `pyro-api`, `pyro-train`, `pyro-openwebcams`)

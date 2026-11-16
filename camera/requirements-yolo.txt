@@ -1,0 +1,2 @@
+ultralytics==8.3.130
+huggingface_hub==0.30.2
