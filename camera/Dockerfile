@@ -6,7 +6,10 @@ COPY requirements.txt requirements-yolo.txt ./
 RUN pip install --no-cache-dir -r requirements.txt \
     && if [ "$INSTALL_YOLO" = "true" ]; then \
          pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu \
-         && pip install --no-cache-dir -r requirements-yolo.txt; \
+         && pip install --no-cache-dir -r requirements-yolo.txt \
+         # ultralytics tire opencv-python (besoin de libxcb/libGL) : on remet la version headless
+         && pip uninstall -y opencv-python \
+         && pip install --no-cache-dir --force-reinstall --no-deps opencv-python-headless==4.11.0.86; \
        fi
 COPY *.py ./
 CMD ["python", "-u", "camera.py"]
