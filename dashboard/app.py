@@ -11,6 +11,7 @@ from PIL import Image, ImageDraw
 from interface import (
     MODE_ARCHIVES,
     MODE_FIRE_HISTORY,
+    MODE_RISK_MAP,
     MODE_SIMULATION,
     apply_theme,
     current_mode,
@@ -117,7 +118,10 @@ def live() -> None:
 apply_theme()
 header()
 mode = current_mode()
-if mode == MODE_ARCHIVES:
+if mode == MODE_RISK_MAP:
+    from risk_map import render_risk_map
+    render_risk_map()
+elif mode == MODE_ARCHIVES:
     from archives import archives
     archives()
 elif mode == MODE_SIMULATION:
@@ -129,6 +133,5 @@ elif mode == MODE_FIRE_HISTORY:
 else:
     st.error(f"Mode de navigation inconnu : {mode}")
 
-st.markdown('<div class="footer"><span>Pyro-Watch · Hackathon Open Data University</span>'
-            '<span>Archives locales · Pyro-SDIS & webcams</span></div>',
+st.markdown('<div class="footer"><span>Pyro-Watch · Hackathon Open Data University</span>',
             unsafe_allow_html=True)

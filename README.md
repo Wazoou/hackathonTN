@@ -19,8 +19,12 @@ est indiquée dans les infobulles et sous le lecteur.
 Le filtre facultatif **Toutes les sources / Pyro-SDIS / Webcams** se trouve dans
 **Période et sources**. Les annotations humaines de fumée restent
 disponibles pour Pyro-SDIS ; les webcams sont non annotées et YOLO reste à connecter.
-La navigation permet de passer entre **Webcam**, **Alerte simulée** et
-**Historique des incendies**. Cet historique utilise l’export IFM+ 2025
+La navigation permet de passer entre **Carte des risques**, **Webcam**,
+**Alerte simulée** et **Historique des incendies**. La carte des risques affiche
+les contours des départements sur le même fond OpenStreetMap ; un clic ouvre une
+fiche provisoire en attendant l’ajout de la base de risques. Les contours sont
+chargés depuis le GeoJSON france-geojson (contours IGN Admin Express COG).
+L’historique utilise l’export IFM+ 2025
 `ifm_plus/data/raw/incendies/Incendies.csv` ; les cercles rouges indiquent les communes
 touchées, avec une position approximative dans chaque commune (ou département si le code
 communal manque). La carte se limite à la France métropolitaine ; la frise permet de
