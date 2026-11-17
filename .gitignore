@@ -10,4 +10,5 @@ runs/
 *.onnx
 .env
 archives-data/
+risk-data/
 pyro-watch-images.tar.gz

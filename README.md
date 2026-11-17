@@ -130,6 +130,42 @@ Pyro-SDIS est inconnu et la correspondance exacte des heures entre sources n’e
 Vérification du parcours après import :
 `docker compose exec -T dashboard python - < tests/check_webcam_ui.py`.
 
+## Carte de risque statique (prévention, solution 1)
+
+Le mode **Carte de risque** du dashboard colore chaque carreau DFCI de 2 km selon la
+sensibilité du terrain au feu. Il réutilise les features statiques du pipeline IFM+
+(branche `manon`, dossier `ifm_plus/`) et les formules de
+`ifm_plus/docs/modelisation_evaluation.md` :
+
+- **Combustible et relief** (0–100) : résineux 40 %, forêt 25 %, lisières 15 %, pente 10 %, pins 10 % ;
+- **Pression humaine** (0–100) : habitat à moins de 200 m de la forêt (WUI) 40 %, routes pondérées 25 %,
+  trafic 20 %, agriculture 15 % ;
+- **Score** : par défaut `combustible × (0,6 + 0,4 × humain / 100)`. Sans végétation, le risque reste nul,
+  et la fréquentation augmente le score d’un massif. Le mode additif permet de régler le poids des piliers.
+
+Les indicateurs non fractionnaires sont convertis en rangs relatifs au département
+(0 = valeur minimale, 1 = valeur maximale). Le score compare donc les carreaux **entre eux** :
+ce n’est ni une probabilité ni un indice comparable d’un département à l’autre, et il n’intègre
+pas la météo (étape suivante : IFM/FWI quotidien Copernicus).
+
+```bash
+# 1. Features statiques de la Gironde (branche manon, plusieurs centaines de Mo téléchargés)
+git worktree add ../hackathon-ifm origin/manon --detach
+cd ../hackathon-ifm/ifm_plus && python -m venv .venv && .venv/bin/pip install -r requirements.txt
+.venv/bin/python scripts/01_download_data.py --departement 33 --layers all
+.venv/bin/python scripts/02_build_static_features.py --departement 33
+cd -
+
+# 2. Scores par carreau -> risk-data/risque_statique_33.geojson (ignoré par Git)
+../hackathon-ifm/ifm_plus/.venv/bin/python ml/build_static_risk.py \
+  --features ../hackathon-ifm/ifm_plus/data/processed/static_features_33.gpkg --out risk-data
+
+# 3. Dashboard
+docker compose up --build -d --no-deps dashboard
+```
+
+Tests : `python -m unittest tests/test_static_risk.py`.
+
 ## Architecture
 
 ```

@@ -108,10 +108,13 @@ apply_theme()
 header()
 with st.sidebar:
     st.caption("Espace de travail")
-    mode = st.radio("Mode", ["Carte des archives", "Surveillance simulée"])
+    mode = st.radio("Mode", ["Carte des archives", "Carte de risque", "Surveillance simulée"])
 if mode == "Carte des archives":
     from archives import archives
     archives()
+elif mode == "Carte de risque":
+    from risk_map import risk_map
+    risk_map()
 else:
     st.caption("Démonstration : images synthétiques et détections simulées avec la configuration par défaut.")
     live()
