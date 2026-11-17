@@ -5,4 +5,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY *.py ./
 COPY timeline_component ./timeline_component
 EXPOSE 8501
+ENV STREAMLIT_THEME_BASE=dark \
+    STREAMLIT_THEME_PRIMARY_COLOR="#65e0bd" \
+    STREAMLIT_THEME_BACKGROUND_COLOR="#0b1119" \
+    STREAMLIT_THEME_SECONDARY_BACKGROUND_COLOR="#131e2b" \
+    STREAMLIT_THEME_TEXT_COLOR="#e5edf5"
 CMD ["streamlit", "run", "app.py", "--server.address=0.0.0.0", "--server.port=8501", "--browser.gatherUsageStats=false"]

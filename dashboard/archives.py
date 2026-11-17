@@ -1,6 +1,7 @@
 """Carte et lecteur communs aux archives Pyro-SDIS et aux webcams."""
 import json
 import os
+from html import escape
 from datetime import datetime, time, timedelta
 from pathlib import Path
 
@@ -38,6 +39,12 @@ def move_frame(step, count):
     stop_playback()
 
 
+def toggle_playback(count):
+    if st.session_state.get("replay_index", 0) == count - 1:
+        st.session_state["replay_index"] = 0
+    st.session_state["archive_playing"] = not st.session_state.get("archive_playing", False)
+
+
 def choose_point(point_id, collection, preferred_camera=None, focus=None, narrow=False):
     frames = [f for f in prepare_frames(collection) if f["point_id"] == point_id
               and (preferred_camera is None or f["camera_id"] == preferred_camera)]
@@ -57,6 +64,14 @@ def choose_point(point_id, collection, preferred_camera=None, focus=None, narrow
 def source_changed(collection):
     source = st.session_state["archive_source"]
     frames = [f for f in prepare_frames(collection) if source == "all" or f["source_key"] == source]
+    st.session_state["archive_dates"] = (frames[0]["time"].date(), frames[-1]["time"].date())
+    stop_playback()
+
+
+def reset_period(collection):
+    frames = prepare_frames(collection)
+    source = st.session_state.get("archive_source", "all")
+    frames = [f for f in frames if source == "all" or f["source_key"] == source]
     st.session_state["archive_dates"] = (frames[0]["time"].date(), frames[-1]["time"].date())
     stop_playback()
 
@@ -106,26 +121,34 @@ def archives():
         choose_point(pending["point_id"], collection)
         st.session_state["last_map_serial"] = pending["serial"]
         st.session_state["last_gauge_serial"] = pending["serial"]
-    with st.popover("↗ Explorer un exemple"):
-        for point in points.values():
-            if point["source_key"] == "webcams":
-                st.button(point["episode"], key=f"example_{point['id']}", on_click=choose_point,
-                          args=(point["id"], collection), kwargs={"focus": datetime.fromisoformat(point["focus"]), "narrow": True},
-                          use_container_width=True)
-        pyro_frames = [f for f in frames if f["source_key"] == "pyro"]
-        if pyro_frames:
-            example = next((f for f in pyro_frames if f["boxes"]), pyro_frames[0])
-            st.button("Pyro-SDIS · fumée annotée", key="example_pyro", on_click=choose_point,
-                      args=(example["point_id"], collection), kwargs={"preferred_camera": example["camera_id"], "focus": example["time"], "narrow": True},
-                      use_container_width=True)
+    st.markdown('<div class="eyebrow">Parcours à explorer</div>', unsafe_allow_html=True)
+    examples = [p for p in points.values() if p["source_key"] == "webcams"]
+    pyro_frames = [f for f in frames if f["source_key"] == "pyro"]
+    slots = st.columns(len(examples) + bool(pyro_frames))
+    labels = {"webcams:frejus": "Fréjus · incendie", "webcams:samena": "Saména · panache",
+              "webcams:canejan": "Canéjan · paysage", "webcams:saint-martin": "Pic Saint-Loup · nuages"}
+    for slot, point in zip(slots, examples):
+        slot.button(labels.get(point["id"], point["name"]), key=f"example_{point['id']}", on_click=choose_point,
+                    args=(point["id"], collection), kwargs={"focus": datetime.fromisoformat(point["focus"]), "narrow": True},
+                    help=point["episode"], use_container_width=True,
+                    type="primary" if st.session_state["archive_point"] == point["id"] else "secondary")
+    if pyro_frames:
+        example = next((f for f in pyro_frames if f["boxes"]), pyro_frames[0])
+        slots[-1].button("Pyro-SDIS · fumée annotée", key="example_pyro", on_click=choose_point,
+                        args=(example["point_id"], collection), kwargs={"preferred_camera": example["camera_id"], "focus": example["time"], "narrow": True},
+                        use_container_width=True)
+    controls, overview, summary = st.columns([1.4, 1, 2.6])
+    overview.button("↔ Toute la période", on_click=reset_period, args=(collection,), use_container_width=True,
+                    help="Rétablir toute la période pour les sources choisies", key="reset_period")
     windows = {900: "15 minutes", 3600: "1 heure", 21600: "6 heures", 86400: "1 jour", 604800: "7 jours", 2592000: "30 jours"}
-    with st.popover("⚙ Affiner la période et les sources"):
+    with controls.popover("Période et sources", use_container_width=True):
         width = st.select_slider("Largeur de la fenêtre observée", options=list(windows), value=3600,
                                  format_func=windows.get, key="archive_window", on_change=stop_playback)
         st.selectbox("Sources", ["all"] + list(collection["sources"]), format_func=SOURCE_LABELS.get,
                      key="archive_source", on_change=source_changed, args=(collection,))
         chosen = st.date_input("Période des archives", min_value=days[0], max_value=days[-1],
                                key="archive_dates", on_change=stop_playback)
+    summary.caption(f"{SOURCE_LABELS[source]} · fenêtre de {windows[width]} · archives historiques")
     if len(chosen) != 2:
         st.info("Sélectionnez la date de fin de la période.")
         return
@@ -146,70 +169,74 @@ def archives():
     window_frames = frames_in_window(period, cursor, timedelta(seconds=width))
     if st.session_state.get("archive_point") not in points:
         st.session_state["archive_point"] = (window_frames or period or frames)[0]["point_id"]
-    render_gauge(times[0], times[-1], cursor, [f["time"] for f in period], width,
-                 list(points.values()), period, st.session_state["archive_point"], scope=scope,
-                 camera_total=len({f["camera_id"] for f in frames}))
-    if not period:
-        st.info("Aucune image sur cette période pour les sources choisies. La carte reste accessible ; cliquez sur un point pour rejoindre ses données.")
-    by_camera = {}
-    for frame in frames:
-        by_camera.setdefault(frame["camera_id"], []).append(frame)
-    with st.expander("Changer de caméra ou de séquence"):
-        point_id = st.selectbox("Point de la carte", list(points), format_func=lambda key: points[key]["name"],
-                                key="archive_point", on_change=stop_playback)
-        cameras = [key for key in by_camera if collection["cameras"][key]["point_id"] == point_id]
-        if st.session_state.get("archive_camera") not in cameras:
-            candidate = min((f for key in cameras for f in by_camera[key]), key=lambda f: abs(f["time"] - cursor))
-            st.session_state["archive_camera"] = candidate["camera_id"]
-        camera = st.selectbox("Caméra", cameras, format_func=lambda key: collection["cameras"][key]["name"],
-                              key="archive_camera", on_change=stop_playback)
-        camera_sequences = sequences(by_camera[camera])
-        signature = (camera, chosen, cursor, source)
-        if st.session_state.get("archive_signature") != signature:
-            st.session_state["archive_sequence"] = min(range(len(camera_sequences)), key=lambda i: min(abs(f["time"] - cursor) for f in camera_sequences[i]))
-            st.session_state["archive_signature"] = signature
-        sequence_id = st.selectbox("Séquence disponible", range(len(camera_sequences)), key="archive_sequence",
-            format_func=lambda i: f"{camera_sequences[i][0]['time']:%d/%m/%Y %H:%M} → {camera_sequences[i][-1]['time']:%d/%m/%Y %H:%M} · {len(camera_sequences[i])} images",
-            on_change=stop_playback)
-        sequence = camera_sequences[sequence_id]
-        st.button("Placer la timeline au début de cette séquence", key="seek_sequence", on_click=choose_point,
-                  args=(point_id, collection), kwargs={"preferred_camera": camera, "focus": sequence[0]["time"]})
-        show_boxes = st.checkbox("Afficher les annotations de référence (fumée)", value=True, key="archive_boxes") if collection["cameras"][camera]["source_key"] == "pyro" else False
-    point = points[point_id]
-    webcam = point["source_key"] == "webcams"
-    st.markdown(f"**{collection['cameras'][camera]['name']}** · {SOURCE_LABELS[point['source_key']]}")
-    st.caption(point["location_note"])
-    if webcam:
-        st.caption(point["evidence"] + " · aucune prédiction du modèle")
-        st.write(point["description"])
-    else:
-        st.caption("Cadres orange : annotations humaines de référence, pas prédictions YOLO.")
-    current = frames_in_window(by_camera[camera], cursor, timedelta(seconds=width))
-    if not current or not period:
-        st.caption("Aucune image de cette caméra dans la fenêtre observée. Séquence la plus proche affichée.")
-        st.button("Rejoindre les images de cette caméra", key="seek_camera", on_click=choose_point,
-                  args=(point_id, collection), kwargs={"preferred_camera": camera})
-    if st.session_state.get("reader_signature") != signature + (sequence_id,):
-        st.session_state["replay_index"] = min(range(len(sequence)), key=lambda i: abs(sequence[i]["time"] - cursor))
-        st.session_state["reader_signature"] = signature + (sequence_id,)
-        stop_playback()
-    player(sequence, show_boxes, point if webcam else None)
-    with st.expander("Provenance des archives"):
-        manifest = collection["sources"][point["source_key"]]
+    map_column, reader_column = st.columns([1.35, 1], gap="large")
+    with map_column:
+        render_gauge(times[0], times[-1], cursor, [f["time"] for f in period], width,
+                     list(points.values()), period, st.session_state["archive_point"], scope=scope,
+                     camera_total=len({f["camera_id"] for f in frames}))
+    with reader_column:
+        if not period:
+            st.info("Aucune image sur cette période pour les sources choisies. La carte reste accessible ; cliquez sur un point pour rejoindre ses données.")
+        by_camera = {}
+        for frame in frames:
+            by_camera.setdefault(frame["camera_id"], []).append(frame)
+        with st.popover("Choisir la caméra / la séquence", use_container_width=True):
+            point_id = st.selectbox("Point de la carte", list(points), format_func=lambda key: points[key]["name"],
+                                    key="archive_point", on_change=stop_playback)
+            cameras = [key for key in by_camera if collection["cameras"][key]["point_id"] == point_id]
+            if st.session_state.get("archive_camera") not in cameras:
+                candidate = min((f for key in cameras for f in by_camera[key]), key=lambda f: abs(f["time"] - cursor))
+                st.session_state["archive_camera"] = candidate["camera_id"]
+            camera = st.selectbox("Caméra", cameras, format_func=lambda key: collection["cameras"][key]["name"],
+                                  key="archive_camera", on_change=stop_playback)
+            camera_sequences = sequences(by_camera[camera])
+            signature = (camera, chosen, cursor, source)
+            if st.session_state.get("archive_signature") != signature:
+                st.session_state["archive_sequence"] = min(range(len(camera_sequences)), key=lambda i: min(abs(f["time"] - cursor) for f in camera_sequences[i]))
+                st.session_state["archive_signature"] = signature
+            sequence_id = st.selectbox("Séquence disponible", range(len(camera_sequences)), key="archive_sequence",
+                format_func=lambda i: f"{camera_sequences[i][0]['time']:%d/%m/%Y %H:%M} → {camera_sequences[i][-1]['time']:%d/%m/%Y %H:%M} · {len(camera_sequences[i])} images",
+                on_change=stop_playback)
+            sequence = camera_sequences[sequence_id]
+            st.button("Placer la timeline au début de cette séquence", key="seek_sequence", on_click=choose_point,
+                      args=(point_id, collection), kwargs={"preferred_camera": camera, "focus": sequence[0]["time"]})
+            show_boxes = st.checkbox("Afficher les annotations de référence (fumée)", value=True, key="archive_boxes") if collection["cameras"][camera]["source_key"] == "pyro" else False
+        point = points[point_id]
+        webcam = point["source_key"] == "webcams"
+        st.markdown(f'<div class="reader-source">{SOURCE_LABELS[point["source_key"]]} · ARCHIVE</div>'
+                    f'<div class="reader-title">{escape(collection["cameras"][camera]["name"])}</div>', unsafe_allow_html=True)
+        current = frames_in_window(by_camera[camera], cursor, timedelta(seconds=width))
+        if not current or not period:
+            st.caption("Aucune image de cette caméra dans la fenêtre observée. Séquence la plus proche affichée.")
+            st.button("Rejoindre les images de cette caméra", key="seek_camera", on_click=choose_point,
+                      args=(point_id, collection), kwargs={"preferred_camera": camera})
+        if st.session_state.get("reader_signature") != signature + (sequence_id,):
+            st.session_state["replay_index"] = min(range(len(sequence)), key=lambda i: abs(sequence[i]["time"] - cursor))
+            st.session_state["reader_signature"] = signature + (sequence_id,)
+            stop_playback()
+        player(sequence, show_boxes, point if webcam else None)
         if webcam:
-            st.markdown(f"Images : [{point['source']}]({point['source_url']})")
-            if point.get("evidence_url"):
-                st.markdown(f"[Documentation de l’événement]({point['evidence_url']})")
-            st.caption(point["coordinate_source"])
-            st.caption(manifest["license_note"])
-            st.write("Les vues de comparaison ne sont pas des annotations négatives de référence.")
+            st.caption(point["evidence"] + " · aucune prédiction du modèle")
+            st.write(point["description"])
         else:
-            st.write(f"Source : {manifest['source']} · révision : {manifest['revision']}")
-            st.write(f"{counts['pyro']:,} images françaises ; splits conservés dans les métadonnées : {manifest['splits']}.")
-            st.caption("Les positions des caméras Pyro-SDIS ne sont pas fournies. Les losanges sont des repères départementaux.")
-            st.caption("Les images d’entraînement ne sont pas un test indépendant pour un modèle entraîné dessus.")
-        st.caption("Dates conservées telles qu’affichées par chaque source ; le fuseau Pyro-SDIS n’est pas renseigné. Leur correspondance exacte entre sources n’est pas garantie.")
-        st.caption("Vert : images disponibles. Gris : aucune image dans la fenêtre. Ces couleurs ne représentent pas des détections.")
+            st.caption("Cadres orange : annotations humaines de référence, pas prédictions YOLO.")
+        with st.expander("Sources et précisions"):
+            st.caption(point["location_note"])
+            manifest = collection["sources"][point["source_key"]]
+            if webcam:
+                st.markdown(f"Images : [{point['source']}]({point['source_url']})")
+                if point.get("evidence_url"):
+                    st.markdown(f"[Documentation de l’événement]({point['evidence_url']})")
+                st.caption(point["coordinate_source"])
+                st.caption(manifest["license_note"])
+                st.write("Les vues de comparaison ne sont pas des annotations négatives de référence.")
+            else:
+                st.write(f"Source : {manifest['source']} · révision : {manifest['revision']}")
+                st.write(f"{counts['pyro']:,} images françaises ; splits conservés dans les métadonnées : {manifest['splits']}.")
+                st.caption("Les positions des caméras Pyro-SDIS ne sont pas fournies. Les losanges sont des repères départementaux.")
+                st.caption("Les images d’entraînement ne sont pas un test indépendant pour un modèle entraîné dessus.")
+            st.caption("Dates conservées telles qu’affichées par chaque source ; le fuseau Pyro-SDIS n’est pas renseigné. Leur correspondance exacte entre sources n’est pas garantie.")
+            st.caption("Vert : images disponibles. Gris : aucune image dans la fenêtre. Ces couleurs ne représentent pas des détections.")
 
 
 @st.fragment(run_every=1)
@@ -220,18 +247,6 @@ def player(sequence, show_boxes, camera_meta=None):
         st.session_state["replay_index"] = min(count - 1, st.session_state["replay_index"] + 1)
         if st.session_state["replay_index"] == count - 1:
             stop_playback()
-    left, mid, right, speed = st.columns([1, 1, 1, 3])
-    left.button("← Précédente", on_click=move_frame, args=(-1, count), disabled=st.session_state["replay_index"] == 0)
-    if mid.button("Pause" if st.session_state.get("archive_playing") else "▶ Lecture", disabled=count < 2):
-        if st.session_state["replay_index"] == count - 1:
-            st.session_state["replay_index"] = 0
-        st.session_state["archive_playing"] = not st.session_state.get("archive_playing", False)
-    right.button("Suivante →", on_click=move_frame, args=(1, count), disabled=st.session_state["replay_index"] == count - 1)
-    speed.caption("Lecture : 1 image par seconde · dates source affichées sous l’image")
-    if count > 1:
-        st.select_slider("Position dans la séquence", options=list(range(count)), key="replay_index",
-                         format_func=lambda i: sequence[i]["time"].strftime("%d/%m %H:%M" if camera_meta else "%H:%M:%S"),
-                         on_change=stop_playback)
     index = st.session_state["replay_index"]
     frame = sequence[index]
     image_path = (ARCHIVE_DIR / frame["image"]).resolve()
@@ -246,10 +261,29 @@ def player(sequence, show_boxes, camera_meta=None):
             x1, y1, x2, y2 = box
             draw.rectangle((x1 * img.width, y1 * img.height, x2 * img.width, y2 * img.height),
                            outline="#f97316", width=max(2, img.width // 350))
-    name = camera_meta["name"] if camera_meta else frame.get("original_camera_id", frame["camera_id"])
-    suffix = camera_meta["credit"] if camera_meta else frame.get("split", "val")
-    st.image(img, caption=f"{name} · {frame['time']:%d/%m/%Y %H:%M:%S} · "
-                         f"image {index + 1}/{count} · {suffix}", use_container_width=True)
+    st.markdown(f'<div class="frame-meta"><strong>{frame["time"]:%d/%m/%Y · %H:%M:%S}</strong>'
+                f'<span>{index + 1} / {count} images</span></div>', unsafe_allow_html=True)
+    if img.width / img.height > 3:
+        crop = st.selectbox("Cadrage du panorama", ["Détail droit", "Panorama complet", "Détail central", "Détail gauche"],
+                            key="panorama_crop", label_visibility="collapsed",
+                            help="Agrandissement de lecture uniquement : le fichier source reste complet.")
+        if crop != "Panorama complet":
+            crop_width = min(img.width, round(img.height * 2.4))
+            offset = {"Détail gauche": 0, "Détail central": (img.width - crop_width) // 2,
+                      "Détail droit": img.width - crop_width}[crop]
+            img = img.crop((offset, 0, offset + crop_width, img.height))
+    st.image(img, use_container_width=True)
+    left, mid, right = st.columns(3)
+    left.button("← Précédente", on_click=move_frame, args=(-1, count), disabled=st.session_state["replay_index"] == 0, use_container_width=True)
+    mid.button("Pause" if st.session_state.get("archive_playing") else "▶ Lecture", disabled=count < 2,
+               type="primary", use_container_width=True, on_click=toggle_playback, args=(count,))
+    right.button("Suivante →", on_click=move_frame, args=(1, count), disabled=st.session_state["replay_index"] == count - 1, use_container_width=True)
+    if count > 1:
+        st.select_slider("Position dans la séquence", options=list(range(count)), key="replay_index",
+                         format_func=lambda i: sequence[i]["time"].strftime("%d/%m %H:%M" if camera_meta else "%H:%M:%S"),
+                         on_change=stop_playback)
+    st.caption("Lecture à 1 image/s · le temps réel entre les prises de vue peut varier.")
+    st.caption(camera_meta["credit"] if camera_meta else f"Source : {frame.get('original_camera_id', frame['camera_id'])} · split {frame.get('split', 'non renseigné')}")
     if camera_meta:
         st.caption(frame["time_basis"])
         st.markdown(f"[Ouvrir l’image source]({frame['source_url']})")
