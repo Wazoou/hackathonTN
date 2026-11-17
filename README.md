@@ -32,7 +32,7 @@ Les compteurs et les infobulles indiquent les images réellement présentes, san
 les trous entre deux prises de vue. Les boutons **Données** passent à la date source précédente
 ou suivante. Le calendrier permet de filtrer une période plus courte.
 
-Sur grand écran, la carte sombre et le lecteur sont côte à côte ; sur petit écran,
+Sur grand écran, la carte claire et le lecteur sont côte à côte ; sur petit écran,
 ils s’empilent. Les boutons des parcours ouvrent directement les exemples de Fréjus,
 Saména, du Pic Saint-Loup, de Canéjan ou de Pyro-SDIS. **Toute la période** rétablit
 les dates complètes pour les sources choisies.

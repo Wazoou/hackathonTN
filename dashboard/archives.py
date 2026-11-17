@@ -174,7 +174,7 @@ def archives():
         render_gauge(times[0], times[-1], cursor, [f["time"] for f in period], width,
                      list(points.values()), period, st.session_state["archive_point"], scope=scope,
                      camera_total=len({f["camera_id"] for f in frames}))
-    with reader_column:
+    with reader_column, st.container(border=True, key="archive_reader"):
         if not period:
             st.info("Aucune image sur cette période pour les sources choisies. La carte reste accessible ; cliquez sur un point pour rejoindre ses données.")
         by_camera = {}
