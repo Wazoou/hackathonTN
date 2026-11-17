@@ -12,4 +12,5 @@ runs/
 
 # Images locales de la carte, partagées hors Git
 archives-data/
+risk-data/
 pyro-watch-images.tar.gz

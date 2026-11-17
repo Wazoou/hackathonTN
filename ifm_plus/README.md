@@ -18,7 +18,7 @@ les commandes, les contrôles et l’état de l’audit.
 
 > Ce pipeline est indépendant de la partie détection caméra/YOLO du dépôt
 > (`api/`, `camera/`, `dashboard/`). Il produit les couches de risque qui
-> pourront alimenter le dashboard.
+> alimentent le mode « Carte de risque » du dashboard (voir `ml/build_static_risk.py`).
 
 ---
 
@@ -108,7 +108,7 @@ ifm_plus/
 │   ├── 02_build_static_features.py  # features statiques (implémenté)
 │   ├── 03_build_dynamic_features.py # météo, lags, table de base (à venir)
 │   ├── 04_build_labels.py       # BDIFF / FIRMS / SDIS -> feu_depart (à venir)
-│   ├── 05_baseline_score.py     # score expert 0-100 (à venir)
+│   ├── 05_baseline_score.py     # score expert 0-100 (à venir ; version statique : ../ml/build_static_risk.py)
 │   ├── 06_train_model.py        # LightGBM/XGBoost + CV temporelle (à venir)
 │   └── 07_evaluate.py           # PR-AUC, lift, SHAP, benchmark IFM (à venir)
 ├── src/ifmplus/
@@ -189,7 +189,7 @@ ensuite les couches selon le périmètre :
 | TMJA réseau national | CSV data.gouv.fr | national, une seule fois (filtre bbox en mode département) |
 | MNT Copernicus 30 m | COG S3 (`/vsicurl`) | 1 fichier par département, lecture fenêtrée |
 | FIRMS | API NASA | emprise du périmètre + 5 jours (clé requise) |
-| BDIFF | export manuel | dossier `data/raw/manual/bdiff_<périmètre>/` |
+| BDIFF | export du portail (`../ml/download_bdiff.py`) ou manuel | dossier `data/raw/manual/bdiff/` |
 | FWI/FFMC/DMC/DC/ISI/BUI | Copernicus EWDS | emprise du périmètre, saison (compte requis) |
 
 En mode France, les couches thématiques sont téléchargées **par département**
@@ -260,7 +260,8 @@ la bbox du périmètre et les contrôles qualité).
    (~25 km). C'est suffisant pour la dynamique temporelle, pas pour des
    gradients locaux. V2 : AROME 2,5 km via l'API Météo-France, ou calcul du
    FWI à partir de la météo horaire.
-2. **BDIFF** : pas d'API de téléchargement en masse ; l'export est manuel.
+2. **BDIFF** : pas d'API ; `../ml/download_bdiff.py` reproduit l'export CSV du portail
+   (France entière, par tranches d'années). Les feux sont localisés à la commune.
    Les feux non déclarés et les petits feux sont sous-représentés.
 3. **FIRMS** : détections satellitaires avec faux positifs (torchères,
    nuages) et passages non quotidiens. À utiliser comme complément, pas comme

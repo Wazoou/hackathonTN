@@ -8,11 +8,12 @@ import pydeck as pdk
 import requests
 import streamlit as st
 from PIL import Image, ImageDraw
+from interface import apply_theme, header
 
 API_URL = os.getenv("API_URL", "http://localhost:8000")
 REFRESH_S = int(os.getenv("REFRESH_S", "5"))
 
-st.set_page_config(page_title="Pyro-Watch", page_icon="🔥", layout="wide")
+st.set_page_config(page_title="Pyro-Watch", page_icon="🔥", layout="wide", initial_sidebar_state="collapsed")
 
 
 def api(path: str, **kw):
@@ -103,6 +104,17 @@ def live() -> None:
                     st.rerun()
 
 
-st.title("🔥 Pyro-Watch")
-st.caption("Détection précoce de feux de forêt à partir de caméras — MVP hackathon")
-live()
+apply_theme()
+header()
+with st.sidebar:
+    st.caption("Espace de travail")
+    mode = st.radio("Mode", ["Carte des archives", "Carte de risque", "Surveillance simulée"])
+if mode == "Carte des archives":
+    from archives import archives
+    archives()
+elif mode == "Carte de risque":
+    from risk_map import risk_map
+    risk_map()
+else:
+    st.caption("Démonstration : images synthétiques et détections simulées avec la configuration par défaut.")
+    live()

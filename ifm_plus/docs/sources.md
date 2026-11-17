@@ -286,8 +286,21 @@ période comme contrôle ; BDIFF reste la source de vérité.
 - Licence : Lov2 (Licence Ouverte 2.0)
 
 Le jeu de données data.gouv.fr ne contient qu'un lien vers le portail, pas de
-fichier téléchargeable ni d'API documentée. La récupération est donc
-**manuelle** :
+fichier téléchargeable ni d'API documentée. Le script `ml/download_bdiff.py`
+(racine du dépôt) reproduit l'export CSV du formulaire : France entière, feux
+de forêt, par tranches d'années (30 000 lignes maximum par export) :
+
+```bash
+python ml/download_bdiff.py --out ifm_plus/data/raw/manual/bdiff --debut 2006 --fin 2024
+```
+
+Colonnes utiles : `Année`, `Numéro`, `Département`, `Code INSEE`,
+`Date de première alerte`, surfaces par type (m²), `Nature` (cause).
+**Pas de coordonnées** : le feu est localisé à la commune. Le serveur envoie
+une chaîne de certificats incomplète (intermédiaire HARICA « GEANT TLS RSA 1 »
+absent), que le script complète sans désactiver TLS.
+
+Récupération manuelle, si le script ne fonctionne plus :
 
 1. Ouvrir le portail BDIFF.
 2. Filtrer **France métropolitaine (96 départements, Corse incluse)**, période **2018-01-01 → 2023-12-31**.
