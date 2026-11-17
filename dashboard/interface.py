@@ -9,8 +9,8 @@ MODE_KEY = "app_mode"
 
 
 def current_mode():
-    """Mode actif, avec « Carte des archives » comme vue d’ouverture."""
-    return st.session_state.get(MODE_KEY, MODE_ARCHIVES)
+    """Mode actif, avec « Carte des risques » comme vue d’ouverture."""
+    return st.session_state.get(MODE_KEY, MODE_RISK_MAP)
 
 
 def _set_mode(mode):
@@ -365,8 +365,8 @@ def header():
             unsafe_allow_html=True,
         )
         with st.container(key="nav_bar"):
-            risk_col, archives_col, simulation_col, history_col, _ = st.columns(
-                [1.7, 1, 1.4, 2.2, 3.7], gap="small"
+            _, risk_col, archives_col, simulation_col, history_col, _ = st.columns(
+                [1.85, 1.7, 1, 1.4, 2.2, 1.85], gap="small"
             )
             risk_col.button(
                 MODE_RISK_MAP,
