@@ -67,3 +67,14 @@ cd dashboard && streamlit run app.py
 - Dataset : [pyronear/pyro-sdis](https://huggingface.co/datasets/pyronear/pyro-sdis), 12 378 images, format YOLO, licence Apache 2.0
 - Modèles : [huggingface.co/pyronear](https://huggingface.co/pyronear)
 - Code Pyronear : [github.com/pyronear](https://github.com/pyronear) (`pyro-engine`, `pyro-api`, `pyro-train`, `pyro-openwebcams`)
+
+## 🔥 IFM+ — score de risque intégré (volet données)
+
+Le dossier [`ifm_plus/`](ifm_plus/README.md) contient un pipeline séparé de
+modélisation du risque de départ de feu à la maille DFCI 2 km : acquisition
+data.gouv.fr / IGN / Copernicus, features combustible–relief–pression humaine,
+puis modèles et benchmark contre l'IFM. Le pipeline fonctionne sur un
+département pilote **ou sur toute la France métropolitaine** (96 départements,
+traitement département par département puis assemblage national).
+Voir le [README du pipeline](ifm_plus/README.md) et la
+[méthodologie](ifm_plus/docs/modelisation_evaluation.md).
