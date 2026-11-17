@@ -4,9 +4,8 @@
 project:
   # perimetre: "departement" (un seul département) ou "france_metro"
   # (96 départements, traitement département par département puis assemblage).
-  perimetre: "departement"
-  departement: "33"
-  nom_departement: "Gironde"
+  perimetre: "france_metro"
+  # Pour un essai local : --departement 33 (ou tout autre code métropolitain).
   # Optionnel : sous-ensemble de départements en mode France, ex. ["33", "40"].
   # Si renseigné, force le périmètre France métropolitaine sur ce sous-ensemble.
   # departements: ["33", "40"]

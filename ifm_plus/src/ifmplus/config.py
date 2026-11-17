@@ -63,7 +63,7 @@ def parse_departements(value: str | None) -> tuple[str, ...] | None:
             "Départements hors France métropolitaine ou invalides : "
             + ", ".join(unknown)
         )
-    return tuple(sorted(codes))
+    return tuple(code for code in METRO_DEPARTEMENTS if code in codes)
 
 
 def _scope_slug(departements: tuple[str, ...]) -> str:
@@ -127,20 +127,28 @@ class Config:
         sources = data.get("sources", {})
         periode = project.get("periode", {})
 
-        scope = str(perimetre or project.get("perimetre", "departement")).strip().lower()
+        scope = str(perimetre or project.get("perimetre", "france_metro")).strip().lower()
         if scope not in PERIMETRES:
             raise ValueError(
                 f"perimetre inconnu : {scope!r} (attendu : {', '.join(PERIMETRES)})"
             )
 
-        dept = normalize_dept(departement or project.get("departement", "33"))
+        if departement is not None and (departements is not None or perimetre == "france_metro"):
+            raise ValueError("--departement est incompatible avec --departements ou --perimetre france_metro")
+        dept = normalize_dept(departement or project.get("departement", ""))
         mois = tuple(int(m) for m in periode.get("mois_saison", [6, 7, 8, 9]))
 
         selected: str | tuple[str, ...] | list[str] | None
-        if departements is None:
-            selected = project.get("departements")
-        else:
+        if departement is not None:
+            scope = "departement"
+            selected = None
+        elif departements is not None:
             selected = departements
+        elif perimetre is not None:
+            # Une demande explicite de France entière annule un ancien sous-ensemble YAML.
+            selected = None
+        else:
+            selected = project.get("departements")
         if isinstance(selected, str):
             selected = parse_departements(selected)
         elif selected is not None:
@@ -152,10 +160,17 @@ class Config:
                 raise ValueError(
                     "Départements hors France métropolitaine : " + ", ".join(unknown)
                 )
+            if not selected:
+                raise ValueError("La liste des départements ne peut pas être vide")
+            selected = tuple(code for code in METRO_DEPARTEMENTS if code in selected)
+            if perimetre == "departement":
+                raise ValueError("--departements est incompatible avec --perimetre departement")
             scope = "france_metro"
         elif scope == "france_metro":
             selected = METRO_DEPARTEMENTS
         else:
+            if dept not in METRO_DEPARTEMENTS:
+                raise ValueError("Préciser un département métropolitain valide avec --departement (ex. 33, 2A)")
             selected = (dept,)
 
         return cls(
@@ -163,7 +178,8 @@ class Config:
             perimetre=scope,
             departements=tuple(selected),
             departement=(selected[0] if scope == "france_metro" else dept),
-            nom_departement=str(project.get("nom_departement", "")),
+            nom_departement=(str(project.get("nom_departement", ""))
+                             if scope == "departement" and dept == normalize_dept(project.get("departement", "")) else ""),
             crs=str(project.get("crs", "EPSG:2154")),
             crs_wgs84=str(project.get("crs_wgs84", "EPSG:4326")),
             resolution_m=float(project.get("resolution_m", 25)),
@@ -344,7 +360,7 @@ class Config:
         pour le périmètre complet (96 départements) ; un sous-ensemble garde
         un suffixe explicite pour ne jamais écraser la sortie nationale.
         """
-        if len(self.departements) == len(METRO_DEPARTEMENTS):
+        if self.france and self.departements == METRO_DEPARTEMENTS:
             return self.processed_dir / "dfci_2km_features_france.parquet"
         return self.processed_dir / f"dfci_2km_features_{self.scope_label}.parquet"
 

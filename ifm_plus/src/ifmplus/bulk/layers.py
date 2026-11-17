@@ -126,9 +126,7 @@ def read_bdtopo(
     for logical in layers:
         layer = find_layer(gpkg, logical)
         if layer is None:
-            log.warning("  couche BD TOPO %s absente de %s", logical, gpkg.name)
-            result[logical] = empty_layer(logical, crs)
-            continue
+            raise LayerError(f"Couche BD TOPO {logical} absente de {gpkg.name} : impossible de conclure à une absence de données sur le territoire")
         wanted = WANTED_FIELDS[logical]
         columns = _select_columns(pyogrio.read_info(gpkg, layer=layer)["fields"], wanted)
         log.info("  lecture BD TOPO %s…", layer)

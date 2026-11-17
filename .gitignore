@@ -9,3 +9,7 @@ runs/
 *.pt
 *.onnx
 .env
+
+# Images locales de la carte, partagées hors Git
+archives-data/
+pyro-watch-images.tar.gz

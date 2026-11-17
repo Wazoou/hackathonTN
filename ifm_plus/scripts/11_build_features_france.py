@@ -39,6 +39,7 @@ import json
 import logging
 import sys
 import time
+from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -55,6 +56,7 @@ from ifmplus.bulk.build import (  # noqa: E402
     build_department,
 )
 from ifmplus.config import Config  # noqa: E402
+from ifmplus.coverage import missing_bulk_inputs, valid_bulk_dem, validate_coverage  # noqa: E402
 from ifmplus.features import (  # noqa: E402
     NEIGHBOURHOOD_SOURCES,
     STATIC_FEATURES,
@@ -209,7 +211,9 @@ def _missing(cfg: Config, needs: dict[str, tuple[str, ...]], resolution: float) 
         sub = cfg.for_departement(dept)
         for bulk_layer, outputs in needs.items():
             expected = outputs or ("dem",)
-            if any(not _bulk_path(sub, layer, resolution).exists() for layer in expected):
+            if any(not _bulk_path(sub, layer, resolution).exists()
+                   or (layer == "dem" and not valid_bulk_dem(_bulk_path(sub, layer, resolution)))
+                   for layer in expected):
                 missing.setdefault(bulk_layer, []).append(dept)
     return missing
 
@@ -570,8 +574,11 @@ def run_france(
         failed,
     )
 
+    if failed:
+        log.error("Assemblage annulé : %s département(s) en échec. Les caches sont conservés pour la reprise.", failed)
+        return 1
     features = pd.concat(frames, ignore_index=True)
-    features = features.drop_duplicates(subset="cell_id", keep="first")
+    coverage = validate_coverage(features, assigned, cfg)
 
     coords = features[["x_centroid", "y_centroid"]]
     log.info("Voisinage 3×3 national sur %s carreaux…", f"{len(features):,}")
@@ -589,6 +596,7 @@ def run_france(
     )
 
     qa = _quality_report(features, france=True)
+    qa["coverage"] = coverage
     log.info(
         "Contrôles : %s carreaux, %s features, forêt moyenne %.1f %%",
         qa["n_cells"],
@@ -696,6 +704,7 @@ def main() -> int:
     cfg.ensure_dirs()
 
     resolution = float(args.resolution or cfg.resolution_m)
+    cfg = replace(cfg, resolution_m=resolution)
     skip = {
         item.strip().lower()
         for item in str(args.skip or "").split(",")
@@ -708,7 +717,7 @@ def main() -> int:
     if "dem" in skip:
         skip.discard("dem")
         skip.add("relief")
-    if args.no_batiment:
+    if args.no_batiment or not cfg.bulk.get("bdtopo", {}).get("include_batiment", True):
         skip.add("batiment")
 
     if _check_inputs(cfg):
@@ -730,6 +739,13 @@ def main() -> int:
             include_batiment=include_batiment,
             dfci_wfs=dfci_wfs,
         )
+
+    missing = missing_bulk_inputs(cfg, resolution, skip)
+    if missing:
+        for dept, layers in missing.items():
+            log.error("[%s] Couches absentes : %s", dept, ", ".join(layers))
+        log.error("Calcul annulé : relancer 10_bulk_download.py ou ignorer explicitement une couche avec --skip.")
+        return 2
 
     if cfg.france:
         return run_france(cfg, args, resolution, skip)

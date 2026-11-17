@@ -12,7 +12,7 @@ import pandas as pd
 import shapely
 from shapely.geometry import box
 
-from .config import Config, normalize_dept
+from .config import METRO_DEPARTEMENTS, Config, normalize_dept
 
 log = logging.getLogger("ifmplus")
 
@@ -283,8 +283,14 @@ def assign_dfci_cells(
         cells = gpd.read_file(cache, engine="pyogrio")
         if not {"cell_id", "id_carreau_dfci", "dept"}.issubset(cells.columns):
             log.warning("  cache incomplet, reconstruction")
-        else:
+        elif (set(cells["dept"].dropna()) == set(METRO_DEPARTEMENTS)
+              and not cells["cell_id"].duplicated().any()
+              and not cells["id_carreau_dfci"].duplicated().any()
+              and all(path.exists() and path.stat().st_mtime_ns <= cache.stat().st_mtime_ns
+                      for path in (cfg.dfci_path, cfg.departements_france_path))):
             return cells
+        else:
+            log.warning("  cache national partiel ou périmé, reconstruction")
 
     if not cfg.dfci_path.exists():
         raise FileNotFoundError(

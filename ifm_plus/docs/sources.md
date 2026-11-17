@@ -290,16 +290,16 @@ fichier téléchargeable ni d'API documentée. La récupération est donc
 **manuelle** :
 
 1. Ouvrir le portail BDIFF.
-2. Filtrer département **33**, période **2018-01-01 → 2023-12-31**.
+2. Filtrer **France métropolitaine (96 départements, Corse incluse)**, période **2018-01-01 → 2023-12-31**.
 3. Exporter en CSV ou GeoJSON.
-4. Déposer le fichier dans `ifm_plus/data/raw/manual/bdiff/`.
+4. Déposer le fichier dans `ifm_plus/data/raw/manual/bdiff_france_metro/` (périmètre national par défaut).
 5. Vérifier les colonnes : `date`, `x`/`y` ou `lon`/`lat`, `surface_ha`,
    `commune`, `code_insee`, `cause`.
 
 Le script 01 crée le dossier et un README avec ces instructions ; le script
 04 normalisera les colonnes.
 
-**Interventions SDIS** : non ouvertes. Une convention avec le SDIS 33 est
+**Interventions SDIS** : non ouvertes. Une convention avec chaque SDIS concerné est
 nécessaire pour obtenir date/heure, commune, coordonnées, surface et cause.
 Ces données sont plus précises que BDIFF pour les petits feux, mais leur
 accès n'est pas garanti dans le cadre du hackathon.

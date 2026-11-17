@@ -3,8 +3,8 @@
 
 Deux périmètres :
 
-- ``--perimetre departement`` (défaut) : un département pilote, bbox locale ;
-- ``--perimetre france_metro`` : France métropolitaine entière, traitée
+- ``--perimetre departement --departement 33`` : un département pilote, bbox locale ;
+- ``--perimetre france_metro`` (défaut) : France métropolitaine entière, traitée
   département par département (les couches WFS sont filtrées par bbox).
 
 Le carroyage DFCI, les contours administratifs, le TMJA et la météo sont

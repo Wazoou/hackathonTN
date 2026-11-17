@@ -5,14 +5,16 @@ de risque quotidien à la maille **DFCI 2 km**, qui combine la météo
 (IFM/FWI), le combustible, le relief et la pression humaine pour estimer la
 probabilité d'un départ de feu.
 
-Le territoire pilote par défaut est la **Gironde (33)**, sur la période
-**2018–2023** (saison juin–septembre pour l'entraînement). Tout est
-paramétrable dans `config.yaml`.
+Le périmètre par défaut est la **France métropolitaine : 96 départements,
+Corse incluse, outre-mer exclu**, sur la période **2018–2023** (saison
+juin–septembre). Chaque département est traité séparément, puis les tables
+sont assemblées et le voisinage est recalculé au niveau national.
+Le mode local reste disponible avec `--departement 33` (ou un autre code).
 
-Le pipeline fonctionne aussi à l'échelle de la **France métropolitaine**
-(96 départements) : chaque département est traité séparément (téléchargement,
-grille 25 m, features), puis les tables sont assemblées et le voisinage 3×3
-est recalculé au niveau national. Voir §3 bis.
+Le maillage national est distinct des facteurs explicatifs et du score :
+sa présence ne signifie pas que toutes les couches sont déjà téléchargées.
+Voir **[docs/couverture_nationale.md](docs/couverture_nationale.md)** pour
+les commandes, les contrôles et l’état de l’audit.
 
 > Ce pipeline est indépendant de la partie détection caméra/YOLO du dépôt
 > (`api/`, `camera/`, `dashboard/`). Il produit les couches de risque qui
@@ -31,8 +33,14 @@ pip install -r requirements.txt
 
 cp .env.example .env            # clés optionnelles (FIRMS, EWDS)
 
-python scripts/01_download_data.py --layers all
-python scripts/02_build_static_features.py
+# Référentiels nationaux et maillage utilisable sans les couches lourdes
+python scripts/01_download_data.py --layers dfci,admin,tmja
+python scripts/00_build_grid.py
+
+# Acquisition nationale reprenable (plusieurs dizaines de Go transférés)
+python scripts/10_bulk_download.py --layers all
+python scripts/11_build_features_france.py --no-fetch
+python scripts/12_check_coverage.py --require-complete
 ```
 
 Sans clé FIRMS/EWDS/BDIFF, le script 01 termine quand même : ces couches sont
@@ -48,7 +56,7 @@ python scripts/01_download_data.py --layers dfci,admin
 Pour un test rapide des couches WFS (100 entités par couche) :
 
 ```bash
-python scripts/01_download_data.py --layers forest,roads --max-features 100
+python scripts/01_download_data.py --departement 33 --layers admin,forest,roads --max-features 100
 ```
 
 ### France métropolitaine
@@ -71,7 +79,10 @@ python scripts/02_build_static_features.py --departements 33,40
 Les deux étapes sont **idempotentes et reprenables** : un fichier déjà présent
 n'est pas retéléchargé, et un département déjà calculé par 02 est relu depuis
 `data/processed/dept/` (utiliser `--force` pour recalculer). Le mode
-« un département » reste disponible et inchangé.
+« un département » est explicite (`--departement 33`). Une table nationale
+n’est publiée que si tous les départements et tous les carreaux attendus sont
+présents. Une couche absente provoque un arrêt ; `--skip` reste possible pour
+un calcul exploratoire, avec les omissions enregistrées dans les métadonnées.
 
 ---
 
@@ -89,6 +100,10 @@ ifm_plus/
 │   ├── features.md              # les 3 piliers et toutes les variables
 │   └── modelisation_evaluation.md
 ├── scripts/
+│   ├── 00_build_grid.py         # maillage GeoParquet sans score
+│   ├── 10_bulk_download.py      # archives IGN / Copernicus nationales
+│   ├── 11_build_features_france.py # facteurs statiques depuis les archives
+│   ├── 12_check_coverage.py     # audit local et catalogue IGN (--catalog)
 │   ├── 01_download_data.py      # acquisition (implémenté)
 │   ├── 02_build_static_features.py  # features statiques (implémenté)
 │   ├── 03_build_dynamic_features.py # météo, lags, table de base (à venir)

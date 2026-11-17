@@ -59,6 +59,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from ifmplus.config import Config  # noqa: E402
+from ifmplus.coverage import missing_wfs_inputs, validate_coverage  # noqa: E402
 from ifmplus.features import (  # noqa: E402
     NEIGHBOURHOOD_SOURCES,
     STATIC_FEATURES,
@@ -695,6 +696,7 @@ def run_france(
     )
 
     features = pd.concat(frames, ignore_index=True)
+    coverage = validate_coverage(features, assigned, cfg)
     coords = features[["x_centroid", "y_centroid"]]
     log.info("Voisinage 3×3 national sur %s carreaux…", f"{len(features):,}")
     features = add_neighbourhood_features(
@@ -711,6 +713,7 @@ def run_france(
     )
 
     qa = _quality_report(features, cfg.perimetre)
+    qa["coverage"] = coverage
     log.info(
         "Contrôles : %s carreaux, %s features, forêt moyenne %.1f %%",
         qa["n_cells"],
@@ -823,6 +826,13 @@ def main() -> int:
         return 2
     if args.skip_relief:
         skip.add("relief")
+
+    missing = missing_wfs_inputs(cfg, resolution, skip)
+    if missing:
+        for dept, layers in missing.items():
+            log.error("[%s] Couches absentes : %s", dept, ", ".join(layers))
+        log.error("Calcul annulé : compléter les téléchargements ou utiliser --skip explicitement.")
+        return 2
 
     if cfg.france:
         return run_france(cfg, args, resolution, skip)

@@ -93,10 +93,12 @@ def probe_tiles(
         if known is None:
             try:
                 response = session.head(tile_url(name), timeout=timeout, allow_redirects=True)
+                if response.status_code not in (200, 404):
+                    response.raise_for_status()
+                    raise RuntimeError(f"Statut inattendu pour la tuile {name}: {response.status_code}")
                 known = response.status_code == 200
             except requests.RequestException as exc:
-                log.warning("  tuile %s : HEAD impossible (%s)", name, exc)
-                known = False
+                raise RuntimeError(f"Tuile {name} non vérifiée ; relancer le téléchargement") from exc
             cache[name] = known
             checked += 1
             if checked % 20 == 0:
@@ -115,56 +117,56 @@ def probe_tiles(
     return available
 
 
-def build_vrt(tiles: list[tuple[int, int]], path: Path) -> Path:
-    """Écrit un VRT référençant les tuiles distantes via ``/vsicurl``."""
+def build_vrt(tiles: list[tuple[int, int]], path: Path, *, source_paths=None) -> Path:
+    """Mosaïque mono-bande, avec les dimensions réelles de chaque tuile.
+
+    La largeur des tuiles Copernicus varie avec la latitude (notamment au
+    nord de 50°). Lire les en-têtes évite un décalage dans le nord de la France.
+    ``source_paths`` permet de vérifier la mosaïque sur des GeoTIFF locaux.
+    """
     if not tiles:
         raise RuntimeError("Aucune tuile Copernicus disponible pour le VRT")
-
-    lats = [lat for lat, _ in tiles]
-    lons = [lon for _, lon in tiles]
-    min_lon, max_lon = min(lons), max(lons) + 1
-    min_lat, max_lat = min(lats), max(lats) + 1
-    width = (max_lon - min_lon) * PIXELS_PER_DEGREE
-    height = (max_lat - min_lat) * PIXELS_PER_DEGREE
+    records = []
+    with rasterio.Env(GDAL_DISABLE_READDIR_ON_OPEN="EMPTY_DIR", GDAL_HTTP_TIMEOUT="60",
+                      GDAL_HTTP_MAX_RETRY="2", GDAL_HTTP_VERSION="1.1"):
+        for lat, lon in tiles:
+            filename = (str(source_paths[(lat, lon)]) if source_paths is not None
+                        else f"/vsicurl/{tile_url(tile_name(lat, lon))}")
+            with rasterio.open(filename) as src:
+                if src.crs is None or src.crs.to_epsg() != 4326:
+                    raise RuntimeError(f"CRS Copernicus inattendu : {filename}")
+                records.append((filename, src.width, src.height, src.bounds, src.nodata))
+    left = min(row[3].left for row in records)
+    right = max(row[3].right for row in records)
+    bottom = min(row[3].bottom for row in records)
+    top = max(row[3].top for row in records)
     pixel = 1.0 / PIXELS_PER_DEGREE
-
-    sources: list[str] = []
-    for lat, lon in tiles:
-        xoff = (lon - min_lon) * PIXELS_PER_DEGREE
-        yoff = (max_lat - (lat + 1)) * PIXELS_PER_DEGREE
+    width = math.ceil((right - left) / pixel - 1e-8)
+    height = math.ceil((top - bottom) / pixel - 1e-8)
+    sources = []
+    for filename, src_width, src_height, bounds, nodata in records:
         sources.append(
-            "  <VRTRasterBand dataType=\"Float32\" band=\"1\">\n"
-            f"    <NoDataValue>{NODATA}</NoDataValue>\n"
-            "    <ComplexSource>\n"
-            f"      <SourceFilename relativeToVRT=\"0\">/vsicurl/{escape(tile_url(tile_name(lat, lon)))}</SourceFilename>\n"
-            "      <SourceBand>1</SourceBand>\n"
-            "      <SourceProperties RasterXSize=\"3600\" RasterYSize=\"3600\" DataType=\"Float32\"/>\n"
-            f"      <SrcRect xOff=\"0\" yOff=\"0\" xSize=\"3600\" ySize=\"3600\"/>\n"
-            f"      <DstRect xOff=\"{xoff}\" yOff=\"{yoff}\" xSize=\"3600\" ySize=\"3600\"/>\n"
-            f"      <NODATA>{NODATA}</NODATA>\n"
-            "    </ComplexSource>\n"
-            "  </VRTRasterBand>"
+            '    <ComplexSource resampling="bilinear">\n'
+            f'      <SourceFilename relativeToVRT="0">{escape(filename)}</SourceFilename>\n'
+            '      <SourceBand>1</SourceBand>\n'
+            f'      <SourceProperties RasterXSize="{src_width}" RasterYSize="{src_height}" DataType="Float32"/>\n'
+            f'      <SrcRect xOff="0" yOff="0" xSize="{src_width}" ySize="{src_height}"/>\n'
+            f'      <DstRect xOff="{(bounds.left-left)/pixel}" yOff="{(top-bounds.top)/pixel}" '
+            f'xSize="{(bounds.right-bounds.left)/pixel}" ySize="{(bounds.top-bounds.bottom)/pixel}"/>\n'
+            + (f'      <NODATA>{nodata}</NODATA>\n' if nodata is not None else '')
+            + '    </ComplexSource>'
         )
-
     xml = (
-        f"<VRTDataset rasterXSize=\"{width}\" rasterYSize=\"{height}\">\n"
-        "  <SRS>EPSG:4326</SRS>\n"
-        f"  <GeoTransform>{min_lon} {pixel} 0 {max_lat} 0 -{pixel}</GeoTransform>\n"
-        + "\n".join(sources)
-        + "\n</VRTDataset>\n"
+        f'<VRTDataset rasterXSize="{width}" rasterYSize="{height}">\n'
+        '  <SRS>EPSG:4326</SRS>\n'
+        f'  <GeoTransform>{left}, {pixel}, 0, {top}, 0, {-pixel}</GeoTransform>\n'
+        '  <VRTRasterBand dataType="Float32" band="1">\n'
+        f'    <NoDataValue>{NODATA}</NoDataValue>\n'
+        + '\n'.join(sources) + '\n  </VRTRasterBand>\n</VRTDataset>\n'
     )
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(xml, encoding="utf-8")
-    log.info(
-        "  VRT MNT : %s tuiles, emprise %s→%s / %s→%s, %s×%s px",
-        len(tiles),
-        min_lon,
-        max_lon,
-        min_lat,
-        max_lat,
-        width,
-        height,
-    )
+    log.info("  VRT MNT : %s tuiles dans une seule bande, %s×%s px", len(tiles), width, height)
     return path
 
 
@@ -178,7 +180,7 @@ def ensure_vrt(
 
     bboxes = [read_bbox_wgs84(cfg.for_departement(dept)) for dept in cfg.departements]
     candidates = candidate_tiles(bboxes)
-    cache = cfg.bulk_raw("dem", "tiles_index.json")
+    cache = cfg.bulk_raw("dem", "tiles_index_v2.json")
     available = probe_tiles(candidates, cache, refresh=refresh)
     path = cfg.bulk_raw("dem", f"copernicus_{cfg.scope_label}.vrt")
     return build_vrt(available, path)
@@ -194,8 +196,11 @@ def _read_window(
     env = rasterio.Env(
         GDAL_DISABLE_READDIR_ON_OPEN="EMPTY_DIR",
         CPL_VSIL_CURL_ALLOWED_EXTENSIONS=".tif",
-        GDAL_HTTP_MULTIPLEX="YES",
-        GDAL_HTTP_VERSION="2",
+        GDAL_HTTP_MULTIPLEX="NO",
+        GDAL_HTTP_VERSION="1.1",
+        GDAL_HTTP_TIMEOUT="60",
+        GDAL_HTTP_MAX_RETRY="2",
+        GDAL_NUM_THREADS="1",
         VRT_VIRTUAL_OVERVIEWS="NO",
     )
     with env, rasterio.open(vrt_path) as src:
@@ -270,7 +275,9 @@ def ensure_department_dem(
     resolution = float(resolution or cfg.resolution_m)
     sub = cfg.for_departement(dept)
     output = cfg.bulk_raw("dem", f"dem_{dept}_{int(resolution)}m.tif")
-    if output.exists() and not force:
+    from ..coverage import valid_bulk_dem
+    metadata = output.with_suffix(".json")
+    if not force and valid_bulk_dem(output):
         return output
 
     bbox = read_bbox(sub)
@@ -281,5 +288,7 @@ def ensure_department_dem(
     if not np.isfinite(array).any():
         raise RuntimeError(f"MNT vide pour le département {dept}")
     write_cog(array, output, grid)
+    metadata.write_text(json.dumps({"mosaic_version": 2, "source_vrt": str(vrt_path),
+                                    "department": dept, "resolution_m": resolution}), encoding="utf-8")
     log.info("  MNT %s -> %s", dept, output.name)
     return output

@@ -1,4 +1,4 @@
-"""Acquisition des couches du pack MVP, filtrées sur le département pilote.
+"""Acquisition des couches du pack MVP, sur le périmètre métropolitain ou départemental choisi.
 
 Chaque fonction est idempotente : si le fichier de sortie existe et que
 ``force=False``, elle ne retélécharge rien. Les couches optionnelles
