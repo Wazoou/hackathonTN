@@ -168,12 +168,16 @@ présentées comme des résultats YOLO. La carte historique n’exécute pas enc
 ### Passer au vrai modèle (phase 2)
 
 ```bash
-docker compose build --build-arg INSTALL_YOLO=true   # installe torch en version CPU (~2 Go)
+cp .env.example .env
+# dans .env : DETECTOR=yolo et INSTALL_YOLO=true
+docker compose up --build    # 1er build long : installe torch en version CPU (~2 Go)
 ```
 
-Puis, dans `docker-compose.yml` : `DETECTOR: yolo`. Par défaut, le modèle utilisé est
-`hf://pyronear/yolo11s_sensitive-detector/best.pt` ; on peut en mettre un autre via
-`YOLO_WEIGHTS`, en chemin local ou en `hf://`.
+Le modèle Pyronear (`hf://pyronear/yolo11s_sensitive-detector/best.pt`) est téléchargé au premier
+lancement dans `.cache/hf/`. Pour en utiliser un autre (après fine-tuning), changer `YOLO_WEIGHTS`
+dans `.env`.
+
+Vérifier que ça marche : `docker compose logs -f cam-1` doit afficher `Détecteur=YoloDetector`.
 
 ### Développement sans Docker
 

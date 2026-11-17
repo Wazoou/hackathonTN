@@ -1,14 +1,20 @@
 # Pyro-Watch : docker compose up --build  ->  dashboard sur http://localhost:8501
+# Vrai modèle : mettre DETECTOR=yolo dans le fichier .env (voir .env.example)
 # Caméras : images réelles du dataset pyro-sdis, coordonnées approximatives (à ajuster).
 
 x-camera: &camera
-  build: ./camera
+  build:
+    context: ./camera
+    args:
+      INSTALL_YOLO: ${INSTALL_YOLO:-false}
   environment: &camera-env
     API_URL: http://api:8000
-    INTERVAL: "5"
-    DETECTOR: dummy          # phase 2 : yolo (build avec INSTALL_YOLO=true)
+    INTERVAL: ${INTERVAL:-5}
+    DETECTOR: ${DETECTOR:-dummy}
+    YOLO_WEIGHTS: ${YOLO_WEIGHTS:-hf://pyronear/yolo11s_sensitive-detector/best.pt}
   volumes:
     - ./data/samples:/samples:ro,z   # ",z" : obligatoire avec SELinux (Fedora)
+    - ./.cache/hf:/root/.cache/huggingface:z   # le modèle n'est téléchargé qu'une fois
   depends_on: [api]
   restart: unless-stopped
 
