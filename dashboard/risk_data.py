@@ -4,8 +4,29 @@
 CLASSES = [(0, "Très faible", (255, 255, 204)), (20, "Faible", (254, 217, 118)),
            (40, "Modéré", (253, 141, 60)), (60, "Élevé", (227, 26, 28)),
            (80, "Très élevé", (128, 0, 38))]
-LAYERS = {"score": "Score de risque", "s_combustible": "Combustible et relief",
-          "s_humain": "Pression humaine"}
+LAYERS = {"p_feu": "Probabilité annuelle de départ (BDIFF)", "score": "Score de risque (expert)",
+          "s_combustible": "Combustible et relief", "s_humain": "Pression humaine"}
+# Bornes des classes pour la probabilité (% par an et par carreau), alignées sur CLASSES.
+PROBA_BOUNDS = [0, 2, 5, 10, 20, 40]
+
+
+def to_scale(value, layer):
+    """Ramène la valeur sur l'échelle 0-100 des classes (linéaire par morceaux pour p_feu)."""
+    if layer != "p_feu":
+        return value
+    for i, (low, high) in enumerate(zip(PROBA_BOUNDS, PROBA_BOUNDS[1:])):
+        if value < high:
+            return 20 * i + 20 * (value - low) / (high - low)
+    return 100
+
+
+def class_ranges(layer):
+    """Libellés de légende : (nom, borne basse, borne haute, couleur)."""
+    if layer == "p_feu":
+        bounds = PROBA_BOUNDS[:-1] + [None]
+        return [(name, f"{lo} %", f"{hi} %" if hi is not None else None, rgb)
+                for (_, name, rgb), lo, hi in zip(CLASSES, bounds, bounds[1:] + [None])]
+    return [(name, str(low), str(low + 20 if low < 80 else 100), rgb) for low, name, rgb in CLASSES]
 
 
 def combine(s_combustible, s_humain, mode="multiplicatif", poids_combustible=0.6):
@@ -45,11 +66,13 @@ def apply_scores(geojson, layer="score", mode="multiplicatif", poids_combustible
     features = []
     for feature in geojson["features"]:
         props = dict(feature["properties"])
+        props.setdefault("dept", "")
         props["score"] = combine(props["s_combustible"], props["s_humain"], mode, poids_combustible)
         value = props[layer]
         props["valeur"] = value
-        props["classe"] = risk_class(value)
-        props["fill"] = color(value, alpha)
+        scaled = to_scale(value, layer)
+        props["classe"] = risk_class(scaled)
+        props["fill"] = color(scaled, alpha)
         for key in ("foret_frac", "resineux_frac", "wui_frac", "agri_frac"):
             if props.get(key) is not None:
                 props[f"{key}_pct"] = f"{100 * props[key]:.0f} %"

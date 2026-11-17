@@ -19,7 +19,7 @@ est indiquée dans les infobulles et sous le lecteur.
 Le filtre facultatif **Toutes les sources / Pyro-SDIS / Webcams** se trouve dans
 **Période et sources**. Les annotations humaines de fumée restent
 disponibles pour Pyro-SDIS ; les webcams sont non annotées et YOLO reste à connecter.
-La surveillance simulée reste accessible dans le sélecteur de mode.
+La **Carte de risque** et la surveillance simulée sont accessibles dans le sélecteur de mode.
 
 La jauge représente le temps de façon continue, avec un histogramme de disponibilité et un
 curseur déplaçable. La jauge, les compteurs et la carte Leaflet sont conservés dans un même
@@ -130,41 +130,96 @@ Pyro-SDIS est inconnu et la correspondance exacte des heures entre sources n’e
 Vérification du parcours après import :
 `docker compose exec -T dashboard python - < tests/check_webcam_ui.py`.
 
-## Carte de risque statique (prévention, solution 1)
+## Carte de risque de départ de feu (prévention)
 
-Le mode **Carte de risque** du dashboard colore chaque carreau DFCI de 2 km selon la
-sensibilité du terrain au feu. Il réutilise les features statiques du pipeline IFM+
-(branche `manon`, dossier `ifm_plus/`) et les formules de
-`ifm_plus/docs/modelisation_evaluation.md` :
+Le mode **Carte de risque** du dashboard colore chaque carreau DFCI de 2 km de 7 départements :
+Alpes-Maritimes (06), Ardèche (07), Bouches-du-Rhône (13), Gironde (33), Hérault (34), Landes (40)
+et Var (83), soit 12 710 carreaux. On peut afficher un département ou **Tous les départements**.
 
-- **Combustible et relief** (0–100) : résineux 40 %, forêt 25 %, lisières 15 %, pente 10 %, pins 10 % ;
-- **Pression humaine** (0–100) : habitat à moins de 200 m de la forêt (WUI) 40 %, routes pondérées 25 %,
-  trafic 20 %, agriculture 15 % ;
-- **Score** : par défaut `combustible × (0,6 + 0,4 × humain / 100)`. Sans végétation, le risque reste nul,
-  et la fréquentation augmente le score d’un massif. Le mode additif permet de régler le poids des piliers.
+Il réutilise les features statiques du pipeline IFM+ (branche `manon`, dossier `ifm_plus/`) :
+végétation (BD Forêt V2), relief (MNT Copernicus) et pression humaine (BD TOPO, trafic, RPG).
+Le volet est **statique** : aucune couche n’intègre la météo (étape suivante : IFM/FWI quotidien Copernicus).
 
-Les indicateurs non fractionnaires sont convertis en rangs relatifs au département
-(0 = valeur minimale, 1 = valeur maximale). Le score compare donc les carreaux **entre eux** :
-ce n’est ni une probabilité ni un indice comparable d’un département à l’autre, et il n’intègre
-pas la météo (étape suivante : IFM/FWI quotidien Copernicus).
+| Couche | Contenu |
+|---|---|
+| **Probabilité annuelle de départ (BDIFF)** | Probabilité qu’au moins un feu de forêt démarre dans l’année dans le carreau, apprise sur l’historique BDIFF (médiane 5,5 %, maximum 60 % autour de Marseille). Classes : < 2 %, 2–5 %, 5–10 %, 10–20 %, ≥ 20 %. |
+| **Score de risque (expert)** | Score 0–100 à poids fixés à dire d’expert, combinaison multiplicative ou additive réglable. |
+| **Combustible et relief** | Sous-score 0–100 : résineux 40 %, forêt 25 %, lisières 15 %, pente 10 %, pins 10 %. |
+| **Pression humaine** | Sous-score 0–100 : habitat à moins de 200 m de la forêt (WUI) 40 %, routes pondérées 25 %, trafic 20 %, agriculture 15 %. |
+
+### Score expert
+
+Les poids viennent de `ifm_plus/docs/modelisation_evaluation.md` ; il n’existe pas de pondération
+officielle de ce type en France (l’IFM officiel est purement météorologique).
+Par défaut, `score = combustible × (0,6 + 0,4 × humain / 100)` : sans végétation, le risque reste nul,
+et la fréquentation augmente le score d’un massif. Le mode additif permet de régler le poids des piliers.
+
+Les indicateurs non fractionnaires sont convertis en rangs calculés sur **tous les départements
+passés ensemble** au script (0 = valeur minimale, 1 = valeur maximale) : les scores sont comparables
+entre ces départements, mais changent si l’on en ajoute un (relancer le script avec la liste complète).
+Un carreau de frontière n’est gardé que dans le département qui en couvre la plus grande part.
+Le score classe les carreaux entre eux ; ce n’est pas une probabilité.
+
+### Probabilité apprise sur l’historique BDIFF
+
+Une **régression logistique** apprend les poids à partir des 18 088 feux de forêt BDIFF 2006–2024
+rattachés aux communes des 7 départements. BDIFF localise chaque feu à la **commune**, pas au point :
+l’unité d’apprentissage est la commune-année (1 si au moins un feu dans l’année), décrite par la moyenne
+des 9 indicateurs du score expert sur ses carreaux et par le logarithme de sa surface. Le modèle est
+ensuite appliqué à chaque carreau, avec ses propres indicateurs et la surface d’un carreau.
+
+| AUC (validation croisée) | Communes inconnues | Département inconnu |
+|---|---:|---:|
+| Régression logistique (9 indicateurs + surface) | **0,757** | **0,724** |
+| Score expert + surface | 0,731 | 0,714 |
+| Surface seule | 0,714 | 0,701 |
+
+Coefficients (indicateurs 0–1) : résineux +4,7, pins −3,9 (les deux sont très corrélés, effet net
+du pin ≈ +0,9), WUI +0,8, lisières +0,8, trafic +0,6, pente +0,6, routes +0,2, forêt −0,2,
+agriculture −1,7, log(surface) +1,0. Le score expert avait les bons signes, sauf pour l’agriculture,
+qui réduit nettement le risque.
+
+Limites : rattachement des carreaux et des feux à la commune (on suppose les carreaux d’une commune
+semblables), communes trop petites pour contenir un centroïde de carreau ignorées (< 1 % des feux),
+qualité de saisie BDIFF variable selon les départements, risque moyen sur l’année sans météo.
+Un essai avec les points chauds satellite NASA FIRMS a été écarté : ils mêlent brûlages agricoles
+et sites industriels, et ne prédisaient pas mieux que le hasard hors Gironde.
+
+### Reproduire la carte
+
+Les fichiers produits (`risk-data/`, environ 8 Mo) sont ignorés par Git ; on peut aussi les partager
+directement et les déposer à la racine du dépôt.
 
 ```bash
-# 1. Features statiques de la Gironde (branche manon, plusieurs centaines de Mo téléchargés)
+# 1. Features statiques (branche manon) : 5 à 25 min et ~500 Mo par département
 git worktree add ../hackathon-ifm origin/manon --detach
-cd ../hackathon-ifm/ifm_plus && python -m venv .venv && .venv/bin/pip install -r requirements.txt
-.venv/bin/python scripts/01_download_data.py --departement 33 --layers all
-.venv/bin/python scripts/02_build_static_features.py --departement 33
+cd ../hackathon-ifm/ifm_plus && python -m venv .venv && .venv/bin/pip install -r requirements.txt scikit-learn
+for d in 06 07 13 33 34 40 83; do
+  .venv/bin/python scripts/01_download_data.py --departement $d --layers dfci,admin,forest,habitat,roads,rpg,tmja,dem
+  .venv/bin/python scripts/02_build_static_features.py --departement $d
+done
 cd -
 
-# 2. Scores par carreau -> risk-data/risque_statique_33.geojson (ignoré par Git)
-../hackathon-ifm/ifm_plus/.venv/bin/python ml/build_static_risk.py \
-  --features ../hackathon-ifm/ifm_plus/data/processed/static_features_33.gpkg --out risk-data
+# 2. Historique des feux BDIFF (France entière, 2006-2024, ~5 Mo)
+../hackathon-ifm/ifm_plus/.venv/bin/python ml/download_bdiff.py --out ../hackathon-ifm/ifm_plus/data/raw/manual/bdiff
 
-# 3. Dashboard
+# 3. Scores et probabilité par carreau -> risk-data/risque_statique_<dept>.geojson
+#    Passer tous les départements en une fois pour des scores comparables.
+../hackathon-ifm/ifm_plus/.venv/bin/python ml/build_static_risk.py \
+  --features ../hackathon-ifm/ifm_plus/data/processed/static_features_*.gpkg --out risk-data \
+  --bdiff ../hackathon-ifm/ifm_plus/data/raw/manual/bdiff
+
+# 4. Dashboard
 docker compose up --build -d --no-deps dashboard
 ```
 
-Tests : `python -m unittest tests/test_static_risk.py`.
+`ml/download_bdiff.py` reproduit l’export CSV du portail https://bdiff.agriculture.gouv.fr/
+(Licence Ouverte 2.0 ; 30 000 lignes maximum par export, d’où le découpage par années). Le serveur
+envoie une chaîne de certificats incomplète : le script ajoute le certificat intermédiaire manquant,
+sans désactiver la vérification TLS. Sans `--bdiff`, seule la partie score expert est produite.
+
+Tests : `python -m unittest tests/test_static_risk.py` ; interface :
+`docker compose exec -T dashboard python - < tests/check_risk_ui.py`.
 
 ## Architecture
 
@@ -180,8 +235,8 @@ Tests : `python -m unittest tests/test_static_risk.py`.
 |---|---|
 | `api/` | Reçoit les images et les détections, crée une alerte après `MIN_CONSECUTIVE` images avec une confiance ≥ `CONF_THRESHOLD`. Doc interactive : http://localhost:8000/docs |
 | `camera/` | Agent caméra (équivalent simplifié de `pyro-engine`). Sources : `synthetic`, un dossier d'images, une vidéo `.mp4`, un flux `rtsp://`, ou l'URL d'une image de webcam publique |
-| `dashboard/` | Interface des pompiers : http://localhost:8501 |
-| `ml/` | Téléchargement du dataset `pyro-sdis`, évaluation et fine-tuning YOLO |
+| `dashboard/` | Interface des pompiers : http://localhost:8501 (carte des archives, carte de risque, surveillance simulée) |
+| `ml/` | Téléchargement du dataset `pyro-sdis`, évaluation et fine-tuning YOLO, import BDIFF et calcul de la carte de risque |
 
 ## Démarrage
 

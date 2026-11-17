@@ -7,7 +7,7 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "dashboard"))
-from risk_data import apply_scores, color, combine, risk_class  # noqa: E402
+from risk_data import apply_scores, color, combine, risk_class, to_scale  # noqa: E402
 
 spec = importlib.util.spec_from_file_location("build_static_risk", ROOT / "ml/build_static_risk.py")
 build = importlib.util.module_from_spec(spec)
@@ -37,7 +37,46 @@ class SubScoreTests(unittest.TestCase):
         self.assertIn("tmja_max", info["colonnes_absentes"])
 
 
+    def test_border_cell_kept_once_in_main_department(self):
+        table = pd.DataFrame({"id_carreau_dfci": ["A", "A", "B"], "dept": ["33", "40", "40"],
+                              "frac_dans_dept": [0.3, 0.7, 1.0]})
+        kept = build.dedupe_border_cells(table)
+        self.assertEqual(sorted(zip(kept.id_carreau_dfci, kept.dept)), [("A", "40"), ("B", "40")])
+
+
+class BdiffModelTests(unittest.TestCase):
+    def setUp(self):
+        self.cells = pd.DataFrame({"code_insee": ["A", "A", "B", "C"], "dept": ["33", "33", "33", "40"]})
+        self.X = pd.DataFrame({"foret_frac": [1.0, 0.5, 0.0, 0.2]})
+
+    def test_commune_table_counts_fire_years_not_fires(self):
+        fires = pd.DataFrame({"code_insee": ["A", "A", "A", "B", "Z"], "annee": [2010, 2010, 2011, 1999, 2010]})
+        table = build.commune_table(self.X, self.cells, fires, range(2010, 2013))
+        self.assertEqual(table.loc["A", "annees_feu"], 2)       # deux feux en 2010 = une année
+        self.assertEqual(table.loc["A", "feux"], 3)
+        self.assertEqual(table.loc["B", "annees_feu"], 0)       # 1999 hors période
+        self.assertAlmostEqual(table.loc["A", "foret_frac"], 0.75)
+        self.assertAlmostEqual(table.loc["A", "log_surface"], 0.6931, places=3)
+        self.assertEqual(table.loc["B", "log_surface"], 0)
+        self.assertNotIn("Z", table.index)                       # commune sans carreau ignorée
+
+    def test_expand_weights_sum_to_commune_years(self):
+        fires = pd.DataFrame({"code_insee": ["A"], "annee": [2010]})
+        table = build.commune_table(self.X, self.cells, fires, range(2010, 2014))
+        _, y, w, _ = build._expand(table, ["foret_frac"])
+        self.assertEqual(w.sum(), 3 * 4)
+        self.assertEqual(w[y == 1].sum(), 1)
+
+
 class CombineTests(unittest.TestCase):
+    def test_probability_scale_matches_legend_bounds(self):
+        self.assertEqual(to_scale(0, "p_feu"), 0)
+        self.assertEqual(to_scale(2, "p_feu"), 20)
+        self.assertEqual(to_scale(7.5, "p_feu"), 50)
+        self.assertEqual(to_scale(90, "p_feu"), 100)
+        self.assertEqual(to_scale(42, "score"), 42)
+        self.assertEqual(risk_class(to_scale(12, "p_feu")), "Élevé")
+
     def test_multiplicative_needs_fuel(self):
         self.assertEqual(combine(0, 100), 0)            # centre-ville sans végétation
         self.assertEqual(combine(80, 0), 48.0)          # massif isolé
