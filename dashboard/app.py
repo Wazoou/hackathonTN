@@ -108,7 +108,8 @@ apply_theme()
 header()
 with st.sidebar:
     st.caption("Espace de travail")
-    mode = st.radio("Mode", ["Carte des archives", "Carte de risque", "Surveillance simulée"])
+    mode = st.radio("Mode", ["Carte des archives", "Carte de risque", "Surveillance simulée"],
+                    index=1 if st.query_params.get("view") == "risk" else 0)
 if mode == "Carte des archives":
     from archives import archives
     archives()

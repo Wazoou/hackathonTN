@@ -4,6 +4,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY *.py ./
 COPY timeline_component ./timeline_component
+COPY risk_component ./risk_component
 EXPOSE 8501
 ENV STREAMLIT_THEME_BASE=light \
     STREAMLIT_THEME_PRIMARY_COLOR="#216e55" \

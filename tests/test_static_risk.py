@@ -1,6 +1,7 @@
 import importlib.util
 import sys
 import unittest
+import tempfile
 from pathlib import Path
 
 import pandas as pd
@@ -35,6 +36,30 @@ class SubScoreTests(unittest.TestCase):
         scores, info = build.sub_scores(table)
         self.assertEqual(scores["s_combustible"].iloc[0], 50.0)
         self.assertIn("tmja_max", info["colonnes_absentes"])
+
+    def test_national_table_joins_by_id_and_rejects_mismatched_grid(self):
+        import geopandas as gpd
+        from shapely.geometry import box
+
+        with tempfile.TemporaryDirectory() as folder:
+            folder = Path(folder)
+            grid = gpd.GeoDataFrame({"cell_id": [1, 2], "id_carreau_dfci": ["A", "B"],
+                                    "departement": ["01", "2A"]},
+                                   geometry=[box(0, 0, 1, 1), box(1, 0, 2, 1)], crs="EPSG:2154")
+            table = pd.DataFrame({"cell_id": [2, 1], "id_carreau_dfci": ["B", "A"],
+                                  "departement": ["2A", "01"], "foret_frac": [0.8, 0.2]})
+            gp, tp = folder / "grid.parquet", folder / "features.parquet"
+            grid.to_parquet(gp); table.to_parquet(tp)
+            cells = build.load_cells([tp], gp).set_index("cell_id")
+            self.assertEqual(cells.loc[1, "foret_frac"], 0.2)
+            self.assertEqual(cells.loc[2, "dept"], "2A")
+            self.assertTrue(cells.loc[2, "geometry"].equals(grid.geometry.iloc[1]))
+            table.loc[0, "departement"] = "33"
+            table.to_parquet(tp)
+            with self.assertRaisesRegex(ValueError, "mêmes cellules"):
+                build.load_cells([tp], gp)
+            with self.assertRaisesRegex(ValueError, "--grid"):
+                build.load_cells([tp])
 
 
     def test_border_cell_kept_once_in_main_department(self):

@@ -191,7 +191,33 @@ qualité de saisie BDIFF variable selon les départements, risque moyen sur l’
 Un essai avec les points chauds satellite NASA FIRMS a été écarté : ils mêlent brûlages agricoles
 et sites industriels, et ne prédisaient pas mieux que le hasard hors Gironde.
 
+Les réglages de la carte nationale sont appliqués directement dans le navigateur : opacité,
+couches, pondérations et départements ne rechargent plus les géométries. Voir le
+[rapport de performances et de tests](docs/performances_carte_risque.md).
+
 ### Reproduire la carte
+
+Pour afficher les mêmes données que l'équipe sans télécharger les sources brutes,
+utilisez l'archive `pyro-watch-risque-france.tar.gz` : les commandes d'installation
+et de vérification sont dans [DONNEES_EQUIPE.md](DONNEES_EQUIPE.md).
+
+Pour la table nationale issue de l’acquisition bulk, joindre les indicateurs au maillage
+par identifiant et calculer tous les départements ensemble :
+
+```bash
+ifm_plus/.venv/bin/python ml/build_static_risk.py \
+  --features ifm_plus/data/processed/dfci_2km_features_france.parquet \
+  --grid ifm_plus/data/processed/dfci_2km_grid_france_metro.parquet \
+  --exclude tmja_max --out risk-data
+docker compose up --build -d --no-deps dashboard
+```
+
+Ouvrir ensuite <http://localhost:8501/?view=risk>. Ce calcul couvre les 139 842 mailles
+des 96 départements, sans météo ni régression BDIFF. Le trafic mesuré est exclu car
+il manque pour 99,1 % des mailles : les poids de pression humaine sont renormalisés
+sur l’habitat proche des forêts, les routes et l’agriculture. Les exclusions, sources
+et valeurs manquantes sont enregistrées dans les métadonnées. Les résultats du pilote
+BDIFF à 7 départements décrits ci-dessus ne constituent pas une validation nationale.
 
 Les fichiers produits (`risk-data/`, environ 8 Mo) sont ignorés par Git ; on peut aussi les partager
 directement et les déposer à la racine du dépôt.

@@ -1,0 +1,22 @@
+{
+  "deck.min.js": {
+    "url": "https://unpkg.com/deck.gl@9.1.14/dist.min.js",
+    "sha256": "059b3d74217dddde552548288c8fc7dbef8b6eb704e945c83e7676982e0f0803"
+  },
+  "DECK-LICENSE": {
+    "url": "https://unpkg.com/deck.gl@9.1.14/LICENSE",
+    "sha256": "e499a2c2ba3b9faabe91fdfddf43e329439263264b7148e5548d0ec605cce9f2"
+  },
+  "maplibre-gl.js": {
+    "url": "https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js",
+    "sha256": "be9633c4d870e26fb37f1cfe5c5a77181667114003ea16207ac7850d8da8add1"
+  },
+  "maplibre-gl.css": {
+    "url": "https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css",
+    "sha256": "576b085fdd9487a65a19215328c1e086c07ce5bf6da09b666b3806d3d008dae9"
+  },
+  "MAPLIBRE-LICENSE": {
+    "url": "https://unpkg.com/maplibre-gl@4.7.1/LICENSE.txt",
+    "sha256": "ee5fc05a0677eaf69601d2c7db0d9ecd6cc27c3abc1d0733bc9ed34707cf8ef2"
+  }
+}

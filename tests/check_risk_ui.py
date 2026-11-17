@@ -1,35 +1,22 @@
-"""Vérifier la carte de risque dans le conteneur :
-docker compose exec -T dashboard python - < tests/check_risk_ui.py"""
-import json
-import os
-import sys
-from pathlib import Path
-
+"""Server smoke test. Browser controls are tested in the persistent component.
+Run: docker compose exec -T dashboard python - < tests/check_risk_ui.py
+"""
+import sys,time,json,base64,gzip
 from streamlit.testing.v1 import AppTest
-
-sys.path.insert(0, "/app")
-from risk_data import LAYERS  # noqa: E402
-
-files = sorted(Path(os.getenv("RISK_DIR", "/risk")).glob("risque_statique_*.geojson"))
-assert files, "aucun risque_statique_*.geojson : lancer ml/build_static_risk.py"
-cells = json.loads(files[0].read_text())["features"]
-props = cells[0]["properties"]
-assert {"id", "s_combustible", "s_humain"} <= props.keys()
-assert all(0 <= c["properties"][k] <= 100 for c in cells for k in ("s_combustible", "s_humain"))
-
-app = AppTest.from_file("/app/app.py", default_timeout=60).run()
-app.sidebar.radio[0].set_value("Carte de risque").run()
-assert not app.exception, app.exception
-layer_radio = next(r for r in app.radio if r.label == "Couche affichée")
-keys = [k for k, label in LAYERS.items() if label in layer_radio.options]
-for key in keys:
-    next(r for r in app.radio if r.label == "Couche affichée").set_value(key).run()
-    assert not app.exception, app.exception
-next(r for r in app.radio if r.label == "Couche affichée").set_value("score").run()
-next(r for r in app.radio if r.label == "Combinaison").set_value("additif").run()
-assert not app.exception, app.exception
-if len(files) > 1:
-    app.selectbox[0].set_value("all").run()
-    assert not app.exception, app.exception
-print(f"Carte de risque : {len(cells)} carreaux ({files[0].name}), {len(keys)} couches "
-      f"et deux modes affichés ; probabilité BDIFF : {'oui' if 'p_feu' in props else 'non'}")
+sys.path.insert(0,'/app')
+from risk_map import cached_payload,RISK_DIR
+from risk_payload import file_signature
+start=time.perf_counter()
+payload=cached_payload(file_signature(RISK_DIR))
+data=json.loads(gzip.decompress(base64.b64decode(payload['payload'])))
+assert len(data['features'])==payload['count']
+assert all(len(s)==payload['count'] for s in data['scores'].values())
+app=AppTest.from_file('/app/app.py',default_timeout=120).run()
+app.sidebar.radio[0].set_value('Carte de risque').run()
+assert not app.exception,app.exception
+assert not app.error,app.error
+assert len(app.get('component_instance'))==1
+start=time.perf_counter();app.run();elapsed=time.perf_counter()-start
+assert not app.exception,app.exception
+print(f"Carte persistante : {payload['departments']} départements, {payload['count']} mailles, "
+      f"{payload['compressed_bytes']/1e6:.2f} Mo compressés ; rerun chaud {elapsed:.3f}s")

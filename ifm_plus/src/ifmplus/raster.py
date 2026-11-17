@@ -9,6 +9,8 @@ le calcul est vectorisé (numpy / scipy.ndimage).
 from __future__ import annotations
 
 import math
+import logging
+from itertools import islice
 from dataclasses import dataclass
 
 import geopandas as gpd
@@ -17,6 +19,8 @@ from affine import Affine
 from rasterio.features import rasterize as rio_rasterize
 from scipy import ndimage
 
+RASTER_BATCH_SIZE = 25_000
+log = logging.getLogger("ifmplus")
 
 @dataclass(frozen=True)
 class AnalysisGrid:
@@ -67,14 +71,25 @@ class AnalysisGrid:
                 for geom, value in zip(gdf.geometry, gdf[values])
                 if geom is not None and value is not None
             )
-        return rio_rasterize(
-            shapes,
-            out_shape=self.shape,
-            transform=self.transform,
-            fill=fill,
-            all_touched=all_touched,
-            dtype=dtype,
-        )
+        # Rasterio materializes and copies geometries: a generator alone does
+        # not bound memory. Burn ordered batches into the same output so that
+        # overlaps keep exactly the same last-geometry-wins semantics.
+        output = np.full(self.shape, fill, dtype=dtype)
+        processed = 0
+        while batch := list(islice(shapes, RASTER_BATCH_SIZE)):
+            rio_rasterize(
+                batch,
+                out=output,
+                transform=self.transform,
+                fill=fill,
+                all_touched=all_touched,
+            )
+            processed += len(batch)
+            if len(gdf) > RASTER_BATCH_SIZE and (
+                processed % (10 * RASTER_BATCH_SIZE) == 0 or len(batch) < RASTER_BATCH_SIZE
+            ):
+                log.info("    rasterisation : %s / %s géométries", f"{processed:,}", f"{len(gdf):,}")
+        return output
 
     def zonal(self, labels: np.ndarray, n_cells: int) -> "ZonalStats":
         return ZonalStats(labels=labels, n_cells=n_cells)

@@ -75,7 +75,9 @@ def sub_scores(table: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
     combustible, miss_c = pillar(table, COMBUSTIBLE)
     humain, miss_h = pillar(table, HUMAIN)
     return pd.DataFrame({"s_combustible": combustible, "s_humain": humain}), {
-        "colonnes_absentes": miss_c + miss_h}
+        "colonnes_absentes": miss_c + miss_h,
+        "taux_valeurs_manquantes": {c: round(float(table[c].isna().mean()), 4)
+                                   for c, _, _ in COMBUSTIBLE + HUMAIN if c in table}}
 
 
 # --- Régression logistique sur l'historique BDIFF (feux localisés à la commune) ---
@@ -177,9 +179,40 @@ def dedupe_border_cells(table: pd.DataFrame) -> pd.DataFrame:
     return table.loc[order.drop_duplicates("id_carreau_dfci").index.sort_values()]
 
 
+def load_cells(paths, grid_path=None):
+    """Join analytical Parquet to its grid by IDs, never by row position."""
+    import geopandas as gpd
+
+    parts = []
+    for path in paths:
+        if path.suffix.lower() == ".parquet":
+            if grid_path is None:
+                raise ValueError("Une table Parquet nécessite --grid (maillage GeoParquet).")
+            table = pd.read_parquet(path)
+            grid = gpd.read_parquet(grid_path).to_crs("EPSG:2154")
+            keys = ["cell_id", "id_carreau_dfci", "departement"]
+            for name, frame in (("table", table), ("maillage", grid)):
+                if frame[keys].isna().any().any() or frame.cell_id.duplicated().any() or frame.id_carreau_dfci.duplicated().any():
+                    raise ValueError(f"Identifiants absents ou dupliqués dans {name}")
+            check = table[keys].merge(grid[keys], on=keys, how="outer", indicator=True, validate="one_to_one")
+            if not check["_merge"].eq("both").all():
+                raise ValueError("La table et le maillage ne couvrent pas exactement les mêmes cellules/départements.")
+            part = grid[keys + ["geometry"]].merge(table, on=keys, validate="one_to_one")
+        else:
+            part = gpd.read_file(path).to_crs("EPSG:2154")
+        part["dept"] = (part["departement"].astype(str) if "departement" in part
+                        else path.stem.removeprefix("static_features_"))
+        parts.append(part)
+    cells = dedupe_border_cells(pd.concat(parts, ignore_index=True)).reset_index(drop=True)
+    return gpd.GeoDataFrame(cells, geometry="geometry", crs="EPSG:2154")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    parser.add_argument("--features", required=True, nargs="+", type=Path, help="static_features_<dept>.gpkg")
+    parser.add_argument("--features", required=True, nargs="+", type=Path, help="GeoPackage départementaux ou table nationale Parquet")
+    parser.add_argument("--grid", type=Path, help="Maillage GeoParquet associé à la table nationale")
+    parser.add_argument("--exclude", nargs="*", default=[], choices=[c for c, _, _ in COMBUSTIBLE + HUMAIN],
+                        help="Indicateurs exclus du calcul ; poids restants renormalisés")
     parser.add_argument("--out", default=Path("risk-data"), type=Path)
     parser.add_argument("--bdiff", type=Path, metavar="DOSSIER",
                         help="Exports BDIFF (ml/download_bdiff.py) : ajoute la régression logistique (couche p_feu)")
@@ -188,13 +221,8 @@ def main():
 
     import geopandas as gpd  # import tardif : les tests n'en ont pas besoin
 
-    parts = []
-    for path in args.features:
-        part = gpd.read_file(path).to_crs("EPSG:2154")
-        part["dept"] = path.stem.removeprefix("static_features_")
-        parts.append(part)
-    cells = dedupe_border_cells(pd.concat(parts, ignore_index=True)).reset_index(drop=True)
-    cells = gpd.GeoDataFrame(cells, geometry="geometry", crs="EPSG:2154")
+    cells = load_cells(args.features, args.grid)
+    cells = cells.drop(columns=args.exclude, errors="ignore")
     scores, info = sub_scores(cells)
     if info["colonnes_absentes"]:
         print("Colonnes absentes (poids renormalisés) :", ", ".join(info["colonnes_absentes"]))
@@ -226,7 +254,9 @@ def main():
     depts = sorted(out["dept"].unique())
     common = {
         "departements_de_reference": depts, "carreaux_de_reference": len(out),
-        "sources": {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in args.features},
+        "sources": {p.name: hashlib.sha256(p.read_bytes()).hexdigest()
+                    for p in args.features + ([args.grid] if args.grid else [])},
+        "indicateurs_exclus": args.exclude,
         "genere_le": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "formules": {"combustible": COMBUSTIBLE, "humain": HUMAIN}, **info,
         **({"regression_logistique": model_info} if model_info else {}),

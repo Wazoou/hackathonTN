@@ -197,6 +197,9 @@ def _read_window(
         GDAL_DISABLE_READDIR_ON_OPEN="EMPTY_DIR",
         CPL_VSIL_CURL_ALLOWED_EXTENSIONS=".tif",
         GDAL_HTTP_MULTIPLEX="NO",
+        # Avoid parallel range reads hanging after a connection failure.
+        GDAL_HTTP_MULTIRANGE="SERIAL",
+        GDAL_HTTP_CONNECTTIMEOUT="20",
         GDAL_HTTP_VERSION="1.1",
         GDAL_HTTP_TIMEOUT="60",
         GDAL_HTTP_MAX_RETRY="2",
