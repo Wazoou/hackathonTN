@@ -15,6 +15,7 @@ from fire_history import (
     fire_records_for_map_period,
     fire_records_for_month,
     format_month,
+    format_slider_month,
     load_fire_records,
     MAP_PERIOD_ALL,
     MAP_PERIOD_MONTH,
@@ -58,6 +59,7 @@ class FireHistoryTests(unittest.TestCase):
             ["2025-01", "2025-02", "2025-03", "2025-04"],
         )
         self.assertEqual(format_month("2025-02"), "Février 2025")
+        self.assertEqual(format_slider_month("2025-02"), "Fév. 2025")
         january = fire_records_for_month(records, "2025-01")
         self.assertEqual(len(january), 2)
         points = build_map_points(

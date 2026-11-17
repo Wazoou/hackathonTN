@@ -16,6 +16,10 @@ MONTH_NAMES = (
     "janvier", "février", "mars", "avril", "mai", "juin",
     "juillet", "août", "septembre", "octobre", "novembre", "décembre",
 )
+MONTH_ABBREVIATIONS = (
+    "Janv.", "Fév.", "Mars", "Avr.", "Mai", "Juin",
+    "Juil.", "Août", "Sept.", "Oct.", "Nov.", "Déc.",
+)
 SEASON_FILTER_ALL = "Toutes les saisons"
 CAUSE_FILTER_ALL = "Toutes les causes"
 MAP_PERIOD_ALL = "Tous les incendies"
@@ -110,6 +114,11 @@ def available_months(records: pd.DataFrame) -> list[str]:
 def format_month(month_key: str) -> str:
     year, month = month_key.split("-")
     return f"{MONTH_NAMES[int(month) - 1].capitalize()} {year}"
+
+
+def format_slider_month(month_key: str) -> str:
+    year, month = month_key.split("-")
+    return f"{MONTH_ABBREVIATIONS[int(month) - 1]} {year}"
 
 
 def fire_records_for_month(records: pd.DataFrame, month_key: str) -> pd.DataFrame:
@@ -238,63 +247,84 @@ def render_fire_history() -> None:
         st.info("Aucun incendie recensé en France métropolitaine.")
         return
 
-    filter_columns = st.columns(3)
-    with filter_columns[0]:
-        selected_map_period = st.selectbox(
-            "Incendies affichés",
-            [MAP_PERIOD_ALL, MAP_PERIOD_MONTH],
-            key="fire_history_map_period",
-        )
-    with filter_columns[1]:
-        selected_season = st.selectbox(
-            "Saison",
-            [SEASON_FILTER_ALL, *SEASON_MONTHS],
-            key="fire_history_season",
-        )
-    with filter_columns[2]:
-        selected_cause = st.selectbox(
-            "Cause",
-            [CAUSE_FILTER_ALL, *CAUSE_VALUES],
-            key="fire_history_cause",
-        )
-
-    filtered_records = filter_fire_records(
-        metropolitan_records,
-        selected_season,
-        selected_cause,
+    st.markdown(
+        """<style>
+        .st-key-fire_history_filters {
+            box-sizing: border-box;
+            min-height: 620px;
+        }
+        .st-key-fire_history_filters,
+        .st-key-fire_history_filters * {
+            font-family: system-ui, sans-serif !important;
+        }
+        .st-key-fire_history_filters [data-testid="stSelectbox"],
+        .st-key-fire_history_filters [data-testid="stSlider"] {
+            margin-right: 0.75rem;
+        }
+        </style>""",
+        unsafe_allow_html=True,
     )
-    if filtered_records.empty:
-        st.info("Aucun incendie ne correspond aux filtres sélectionnés.")
-        return
+    map_column, filters_column = st.columns([2.1, 1], gap="large")
+    with filters_column:
+        with st.container(border=True, key="fire_history_filters"):
+            st.markdown(
+                '<h2 style="margin:0 0 12px;color:#1b3c59;font-size:18px;'
+                'font-family:system-ui,sans-serif">Carte des incendies passés</h2>',
+                unsafe_allow_html=True,
+            )
+            selected_map_period = st.selectbox(
+                "Incendies affichés",
+                [MAP_PERIOD_ALL, MAP_PERIOD_MONTH],
+                key="fire_history_map_period",
+            )
+            selected_season = st.selectbox(
+                "Saison",
+                [SEASON_FILTER_ALL, *SEASON_MONTHS],
+                key="fire_history_season",
+            )
+            selected_cause = st.selectbox(
+                "Cause",
+                [CAUSE_FILTER_ALL, *CAUSE_VALUES],
+                key="fire_history_cause",
+            )
 
-    months = available_months(filtered_records)
-    if st.session_state.get("fire_history_month") not in months:
-        st.session_state["fire_history_month"] = months[-1]
-    selected_month = st.select_slider(
-        "Mois et année",
-        options=months,
-        format_func=format_month,
-        key="fire_history_month",
-        label_visibility="collapsed",
-    )
-    month_records = fire_records_for_map_period(
-        filtered_records,
-        selected_map_period,
-        selected_month,
-    )
-    if month_records.empty:
-        st.info(f"Aucun incendie recensé en {format_month(selected_month)}.")
-        return
-    located = month_records.dropna(subset=["latitude", "longitude"])
+            filtered_records = filter_fire_records(
+                metropolitan_records,
+                selected_season,
+                selected_cause,
+            )
+            if filtered_records.empty:
+                st.info("Aucun incendie ne correspond aux filtres sélectionnés.")
+                return
 
-    unmapped_count = len(month_records) - len(located)
-    if unmapped_count:
-        st.warning(
-            f"{unmapped_count:,} incendie(s) sans coordonnées ne sont pas représentés sur la carte."
-        )
-    if located.empty:
-        st.info(f"Aucun incendie recensé en {format_month(selected_month)}.")
-        return
+            months = available_months(filtered_records)
+            if st.session_state.get("fire_history_month") not in months:
+                st.session_state["fire_history_month"] = months[-1]
+            selected_month = st.select_slider(
+                "Mois et année",
+                options=months,
+                format_func=format_slider_month,
+                key="fire_history_month",
+                label_visibility="collapsed",
+            )
+            month_records = fire_records_for_map_period(
+                filtered_records,
+                selected_map_period,
+                selected_month,
+            )
+            if month_records.empty:
+                st.info(f"Aucun incendie recensé en {format_month(selected_month)}.")
+                return
+            located = month_records.dropna(subset=["latitude", "longitude"])
+
+            unmapped_count = len(month_records) - len(located)
+            if unmapped_count:
+                st.warning(
+                    f"{unmapped_count:,} incendie(s) sans coordonnées ne sont pas représentés sur la carte."
+                )
+            if located.empty:
+                st.info(f"Aucun incendie recensé en {format_month(selected_month)}.")
+                return
 
     points = build_map_points(located)
     try:
@@ -302,4 +332,5 @@ def render_fire_history() -> None:
     except OSError as error:
         st.error(f"Impossible de charger les fichiers cartographiques : {error}")
         return
-    components.html(map_html, height=620, scrolling=False)
+    with map_column:
+        components.html(map_html, height=620, scrolling=False)
