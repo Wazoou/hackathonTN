@@ -1,0 +1,101 @@
+# Configuration du pipeline IFM+
+# Tous les chemins sont relatifs au dossier ifm_plus/ (sauf indication contraire).
+
+project:
+  # perimetre: "departement" (un seul département) ou "france_metro"
+  # (96 départements, traitement département par département puis assemblage).
+  perimetre: "departement"
+  departement: "33"
+  nom_departement: "Gironde"
+  # Optionnel : sous-ensemble de départements en mode France, ex. ["33", "40"].
+  # Si renseigné, force le périmètre France métropolitaine sur ce sous-ensemble.
+  # departements: ["33", "40"]
+  crs: "EPSG:2154"          # Lambert-93
+  crs_wgs84: "EPSG:4326"
+  resolution_m: 25          # résolution de la grille d'analyse (features de couverture)
+  buffer_m: 2500            # marge autour du département (cellules DFCI de bord)
+  periode:
+    debut: "2018-01-01"
+    fin: "2023-12-31"
+    mois_saison: [6, 7, 8, 9]
+  tmja_annee_reference: 2022
+
+paths:
+  raw: "data/raw"
+  interim: "data/interim"
+  processed: "data/processed"
+  logs: "data/logs"
+
+sources:
+  datagouv_api: "https://www.data.gouv.fr/api/1"
+  dfci_slug: "carroyage-dfci-2-km"
+  tmja_slug: "trafic-moyen-journalier-annuel-sur-le-reseau-routier-national"
+  bdiff_slug: "base-de-donnees-sur-les-incendies-de-forets-en-france-bdiff"
+  wfs_url: "https://data.geopf.fr/wfs/ows"
+  copernicus_dem: "https://copernicus-dem-30m.s3.amazonaws.com"
+  firms_api: "https://firms.modaps.eosdis.nasa.gov/api/area/csv"
+
+firms:
+  source: "VIIRS_SNPP_SP"   # produit standard, adapté à l'historique
+  day_range: 5
+  # La clé se met dans ifm_plus/.env : FIRMS_MAP_KEY=...
+  # Pour 2018-2023 en entier, préférer les archives annuelles FIRMS.
+
+weather:
+  # Copernicus Early Warning Data Store (EWDS)
+  dataset: "cems-fire-historical-v1"
+  variables:
+    - fine_fuel_moisture_code
+    - duff_moisture_code
+    - drought_code
+    - initial_fire_spread_index
+    - build_up_index
+    - fire_weather_index
+
+roads:
+  # Réseau retenu pour la pression humaine : réseau classé + pistes DFCI.
+  # importance BD TOPO : 1 autoroute, 2 nationale, 3 départementale, 4 communale.
+  importance_max: 4
+  include_dfci_tracks: true
+
+# ----------------------------------------------------------------------
+# Track « bulk » : archives Géoplateforme au lieu du WFS pour les couches
+# lourdes (BD TOPO, BD Forêt V2, RPG). Traitement streaming département
+# par département, normalisation en GeoParquet puis purge du brut.
+# ----------------------------------------------------------------------
+bulk:
+  geopf_base: "https://data.geopf.fr/telechargement"
+  # Nombre de téléchargements simultanés (1–4). L'API IGN est limitée à
+  # 10 requêtes/s/IP ; au-delà de 2 workers le gain est faible.
+  workers: 2
+  # Conserver les archives .7z téléchargées (sinon purge après extraction).
+  keep_raw: false
+
+  bdtopo:
+    # "latest" (dernière édition trimestrielle) ou une date, ex. "2025-03-15".
+    edition: "latest"
+    # Couche bâtiment volumineuse (~1,4 M polygones pour la Gironde) :
+    # désactivable avec --no-batiment, au prix des features de bâti.
+    include_batiment: true
+
+  bdforet:
+    version: "2-0"          # repli V1 automatique si V2 absente
+
+  rpg:
+    # Le RPG 4.0 est diffusé par région (R11…R94) depuis 2024.
+    year: 2025
+    # Repli sur l'archive nationale FXX (~11 Go) si une région manque :
+    # désactivé par défaut (le téléchargement est unique mais très lourd).
+    allow_national_fallback: false
+
+  dem:
+    # MNT Copernicus DEM 30 m lu via un VRT /vsicurl puis reprojeté en COG
+    # Lambert-93 à la résolution de la grille d'analyse.
+    source: "copernicus-dem-30m"
+    resolution_m: 25
+
+  # Enrichissement attributaire léger des pistes DFCI via WFS (cleabs
+  # uniquement). Seule exception WFS du track bulk : le GPKG IGN ne
+  # contient pas l'attribut piste_dfci.
+  dfci_wfs: true
+

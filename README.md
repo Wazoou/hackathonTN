@@ -130,15 +130,21 @@ Pyro-SDIS est inconnu et la correspondance exacte des heures entre sources n’e
 Vérification du parcours après import :
 `docker compose exec -T dashboard python - < tests/check_webcam_ui.py`.
 
-## Carte de risque de départ de feu (prévention)
+## 🔥 IFM+ et carte de risque de départ de feu (prévention)
 
-Le mode **Carte de risque** du dashboard colore chaque carreau DFCI de 2 km de 7 départements :
+Le dossier [`ifm_plus/`](ifm_plus/README.md) contient le pipeline de modélisation du risque de départ
+de feu à la maille DFCI 2 km : acquisition data.gouv.fr / IGN / Copernicus, features
+combustible–relief–pression humaine, puis modèles et benchmark contre l'IFM. Il fonctionne sur un
+département pilote **ou sur toute la France métropolitaine** (96 départements, traitement département
+par département puis assemblage national). Voir le [README du pipeline](ifm_plus/README.md) et la
+[méthodologie](ifm_plus/docs/modelisation_evaluation.md).
+
+Le mode **Carte de risque** du dashboard en affiche le résultat pour chaque carreau de 7 départements :
 Alpes-Maritimes (06), Ardèche (07), Bouches-du-Rhône (13), Gironde (33), Hérault (34), Landes (40)
 et Var (83), soit 12 710 carreaux. On peut afficher un département ou **Tous les départements**.
-
-Il réutilise les features statiques du pipeline IFM+ (branche `manon`, dossier `ifm_plus/`) :
-végétation (BD Forêt V2), relief (MNT Copernicus) et pression humaine (BD TOPO, trafic, RPG).
-Le volet est **statique** : aucune couche n’intègre la météo (étape suivante : IFM/FWI quotidien Copernicus).
+Il s'appuie sur les features statiques d'`ifm_plus/` : végétation (BD Forêt V2), relief (MNT Copernicus)
+et pression humaine (BD TOPO, trafic, RPG). Le volet est **statique** : aucune couche n’intègre la météo
+(étape suivante : IFM/FWI quotidien Copernicus, étape 03 du pipeline).
 
 | Couche | Contenu |
 |---|---|
@@ -191,23 +197,24 @@ Les fichiers produits (`risk-data/`, environ 8 Mo) sont ignorés par Git ; on pe
 directement et les déposer à la racine du dépôt.
 
 ```bash
-# 1. Features statiques (branche manon) : 5 à 25 min et ~500 Mo par département
-git worktree add ../hackathon-ifm origin/manon --detach
-cd ../hackathon-ifm/ifm_plus && python -m venv .venv && .venv/bin/pip install -r requirements.txt scikit-learn
+# 1. Features statiques (ifm_plus/) : 5 à 25 min et ~500 Mo par département
+python3 -m venv ifm_plus/.venv
+ifm_plus/.venv/bin/pip install -r ifm_plus/requirements.txt scikit-learn
+cd ifm_plus
 for d in 06 07 13 33 34 40 83; do
   .venv/bin/python scripts/01_download_data.py --departement $d --layers dfci,admin,forest,habitat,roads,rpg,tmja,dem
   .venv/bin/python scripts/02_build_static_features.py --departement $d
 done
-cd -
+cd ..
 
 # 2. Historique des feux BDIFF (France entière, 2006-2024, ~5 Mo)
-../hackathon-ifm/ifm_plus/.venv/bin/python ml/download_bdiff.py --out ../hackathon-ifm/ifm_plus/data/raw/manual/bdiff
+ifm_plus/.venv/bin/python ml/download_bdiff.py --out ifm_plus/data/raw/manual/bdiff
 
 # 3. Scores et probabilité par carreau -> risk-data/risque_statique_<dept>.geojson
 #    Passer tous les départements en une fois pour des scores comparables.
-../hackathon-ifm/ifm_plus/.venv/bin/python ml/build_static_risk.py \
-  --features ../hackathon-ifm/ifm_plus/data/processed/static_features_*.gpkg --out risk-data \
-  --bdiff ../hackathon-ifm/ifm_plus/data/raw/manual/bdiff
+ifm_plus/.venv/bin/python ml/build_static_risk.py \
+  --features ifm_plus/data/processed/static_features_*.gpkg --out risk-data \
+  --bdiff ifm_plus/data/raw/manual/bdiff
 
 # 4. Dashboard
 docker compose up --build -d --no-deps dashboard
