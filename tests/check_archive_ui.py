@@ -61,6 +61,14 @@ with patch("timeline_gauge.render", return_value=None) as gauge:
     assert at.session_state["archive_cursor"] == datetime(2025, 7, 7, 11, 31)
     at.button(key="example_webcams:canejan").click().run()
     assert at.session_state["archive_cursor"].year == 2022
+    at.button(key="reset_period").click().run()
+    assert len(gauge.call_args.args[6]) == len(pyro["frames"]) + len(webcams["frames"])
+    assert at.session_state["archive_camera"] == "webcams:canejan"
+    at.button(key="example_webcams:frejus").click().run()
+    at.selectbox(key="panorama_crop").set_value("Panorama complet").run()
+    assert not at.exception, at.exception
+    assert at.session_state["replay_index"] == 5
+    at.selectbox(key="panorama_crop").set_value("Détail droit").run()
     print("Passage entre sources, exemples et synchronisation temporelle : OK")
 
     for source, point_count, frame_count in [("pyro", 6, len(pyro["frames"])), ("webcams", 4, 29), ("all", 10, len(pyro["frames"]) + 29)]:

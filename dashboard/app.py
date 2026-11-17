@@ -8,6 +8,7 @@ import pydeck as pdk
 import requests
 import streamlit as st
 from PIL import Image, ImageDraw
+from interface import apply_theme, header
 
 API_URL = os.getenv("API_URL", "http://localhost:8000")
 REFRESH_S = int(os.getenv("REFRESH_S", "5"))
@@ -103,7 +104,8 @@ def live() -> None:
                     st.rerun()
 
 
-st.title("🔥 Pyro-Watch")
+apply_theme()
+header()
 with st.sidebar:
     st.caption("Espace de travail")
     mode = st.radio("Mode", ["Carte des archives", "Surveillance simulée"])

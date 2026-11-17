@@ -17,7 +17,7 @@ L’import actuel représente **12 252 images, 200 identifiants de caméras et 1
 6 départements Pyro-SDIS (losanges) et 4 webcams (ronds). La précision des coordonnées
 est indiquée dans les infobulles et sous le lecteur.
 Le filtre facultatif **Toutes les sources / Pyro-SDIS / Webcams** se trouve dans
-**Affiner la période et les sources**. Les annotations humaines de fumée restent
+**Période et sources**. Les annotations humaines de fumée restent
 disponibles pour Pyro-SDIS ; les webcams sont non annotées et YOLO reste à connecter.
 La surveillance simulée reste accessible dans le sélecteur de mode.
 
@@ -30,7 +30,22 @@ Une fenêtre centrée sur le curseur est réglable de 15 minutes à 30 jours :
 un point devient vert s'il existe au moins une image dans cette fenêtre, gris sinon.
 Les compteurs et les infobulles indiquent les images réellement présentes, sans interpoler
 les trous entre deux prises de vue. Les boutons **Données** passent à la date source précédente
-ou suivante. Le calendrier permet de zoomer sur une période plus courte.
+ou suivante. Le calendrier permet de filtrer une période plus courte.
+
+Sur grand écran, la carte claire et le lecteur sont côte à côte ; sur petit écran,
+ils s’empilent. Les boutons des parcours ouvrent directement les exemples de Fréjus,
+Saména, du Pic Saint-Loup, de Canéjan ou de Pyro-SDIS. **Toute la période** rétablit
+les dates complètes pour les sources choisies.
+
+Le **zoom temporel** agrandit l’échelle autour du curseur, sans modifier la fenêtre
+de disponibilité ni recharger la carte. **Tout voir** rétablit l’échelle de la période
+filtrée. **Recentrer** affiche tous les repères ; **Point sélectionné** centre la carte
+sur la sélection. La molette et le pavé tactile permettent toujours de zoomer.
+
+Le lecteur propose une lecture pas à pas ou automatique. Pour les panoramas très larges,
+le cadrage permet de passer du détail droit (affiché initialement) au panorama complet,
+au centre ou à gauche. Ce recadrage d’affichage ne modifie aucun fichier source.
+Les informations de localisation et de provenance se trouvent dans **Sources et précisions**.
 
 ```bash
 python3 -m venv .venv
