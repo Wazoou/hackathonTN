@@ -9,3 +9,5 @@ runs/
 *.pt
 *.onnx
 .env
+archives-data/
+pyro-watch-images.tar.gz

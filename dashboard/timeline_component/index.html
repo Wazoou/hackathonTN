@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><link rel="stylesheet" href="vendor/leaflet.css"><script src="vendor/leaflet.js"></script><style>
+*{box-sizing:border-box}body{margin:0;font:14px system-ui,sans-serif;background:transparent;color:#e2e8f0}
+.panel{border:1px solid #334155;border-radius:14px;padding:18px 20px;background:#111b2d}
+.top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px}
+.title{font-size:12px;color:#94a3b8;text-transform:uppercase;letter-spacing:.09em}
+#date{display:block;color:#f8fafc;font-size:22px;font-weight:650;margin-top:4px;font-variant-numeric:tabular-nums}
+button{background:#1e293b;color:#e2e8f0;border:1px solid #475569;border-radius:7px;padding:8px 12px;cursor:pointer}
+button:hover{border-color:#60a5fa}button:disabled{opacity:.4;cursor:default}
+.track{position:relative;height:67px;margin:0 12px}#bars{position:absolute;inset:0 0 17px;display:flex;align-items:end;gap:2px;overflow:hidden}
+.bar{background:#3b82f6;flex:1;min-width:1px;border-radius:2px 2px 0 0;opacity:.7}
+#window{position:absolute;top:0;bottom:11px;background:#38bdf822;border:1px solid #38bdf8;border-radius:4px;pointer-events:none}
+#needle{position:absolute;top:-5px;bottom:9px;width:2px;background:#f8fafc;pointer-events:none;box-shadow:0 0 8px #fff5}
+input{position:absolute;left:-12px;bottom:0;width:calc(100% + 24px);height:24px;margin:0;background:transparent;appearance:none;cursor:ew-resize;touch-action:none}
+input::-webkit-slider-runnable-track{height:5px;background:#334155;border-radius:4px}
+input::-webkit-slider-thumb{appearance:none;width:22px;height:22px;border-radius:50%;background:#f8fafc;border:4px solid #3b82f6;margin-top:-8px;box-shadow:0 0 0 4px #3b82f622}
+input::-moz-range-track{height:5px;background:#334155}input::-moz-range-thumb{width:15px;height:15px;background:white;border:4px solid #3b82f6;border-radius:50%}
+input:focus-visible{outline:2px solid #38bdf8;outline-offset:4px;border-radius:8px}
+.labels,.foot{display:flex;justify-content:space-between;gap:10px;font-size:12px;color:#94a3b8;margin-top:8px}
+.foot{border-top:1px solid #334155;margin-top:12px;padding-top:10px}.foot span:last-child{color:#7dd3fc}
+@media(max-width:650px){#date{font-size:17px}.top{align-items:start}.buttons{display:flex;gap:4px}button{padding:6px}.foot{flex-direction:column}}
+.metrics{display:flex;gap:35px;margin:16px 0}.metrics>div{flex:1;color:#94a3b8;font-size:12px}.metrics strong{display:block;font-size:27px;color:#f8fafc;margin-top:5px}
+.legend{font-size:13px;margin:12px 0}.note{font-size:12px;color:#94a3b8;line-height:1.6;margin:12px 0}
+#map{height:360px;border:1px solid #334155;border-radius:12px;background:#17212b}.leaflet-tooltip{background:#111b2d;color:#e2e8f0;border-color:#475569}.leaflet-container{font:13px system-ui,sans-serif}
+/* Le filtre porte seulement sur le fond : les points gardent leurs couleurs. */
+#map .leaflet-tile-pane{filter:grayscale(1) invert(1) brightness(.75) contrast(1.1)}
+.leaflet-tooltip{white-space:normal;min-width:180px;max-width:320px;line-height:1.45}
+.archive-marker{background:transparent;border:0;display:grid;place-items:center}
+.point-symbol{display:block;width:var(--size,18px);height:var(--size,18px);background:var(--fill,#64748b);border:var(--weight,1px) solid var(--stroke,#94a3b8);box-shadow:0 1px 5px #0008}
+.point-webcams{border-radius:50%}.point-pyro{transform:rotate(45deg);border-radius:2px}
+</style></head><body><div class="panel">
+<div class="top"><div><div class="title">Naviguer dans les archives</div><output id="date" aria-live="off"></output></div>
+<div class="buttons"><button id="previous" aria-label="Date avec données précédente">← Données</button> <button id="next" aria-label="Date avec données suivante">Données →</button></div></div>
+<div class="track"><div id="bars"></div><div id="window"></div><div id="needle"></div>
+<input type="range" id="cursor" min="0" step="1" aria-label="Curseur temporel des archives"></div>
+<div class="labels"><span id="start"></span><span id="end"></span></div>
+<div class="foot"><span>Barres : images disponibles · zone bleue : fenêtre observée</span><span id="range"></span></div></div>
+<div class="metrics"><div>Images dans la fenêtre<strong id="image-count">0</strong></div><div>Caméras avec des images<strong id="camera-count">0</strong></div><div><span id="point-label">Départements</span> avec des images<strong id="department-count">0</strong></div></div>
+<div class="legend">● Webcam　 ◆ Pyro-SDIS : repère départemental　 ·　 🟢 Images disponibles　 ⚪ Aucune image dans la fenêtre</div>
+<div class="note">Glissez le curseur : les couleurs changent immédiatement. Les boutons Données rejoignent la date précédente ou suivante avec des images. Le lecteur d’images se synchronise au relâchement du curseur.</div>
+<div class="note">Les ronds sont les positions publiées des webcams ; les losanges regroupent les caméras Pyro-SDIS d’un département, sans coordonnées exactes. Cliquez sur un repère pour ouvrir ses images et rejoindre une date disponible si nécessaire.</div>
+<div id="map" aria-label="Carte des archives françaises"></div>
+<script>
+const el=id=>document.getElementById(id); let props, dragging=false, lastValue, local=0, map, selectedPoint;
+const markers=new Map();
+const send=(type,extra={})=>parent.postMessage({isStreamlitMessage:true,type,...extra},'*');
+// Les dates sont traitées sans conversion de fuseau, comme les dates du dataset.
+const origin=()=>Date.parse(props.start+'Z');
+const format=v=>new Date(origin()+v*1000).toLocaleString('fr-FR',{timeZone:'UTC',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'});
+function paint(){
+ const value=+el('cursor').value;local=value;
+ el('date').textContent=format(value);
+ const lo=Math.max(0,value-props.width_seconds/2),hi=Math.min(props.duration,value+props.width_seconds/2);
+ el('window').style.left=(lo/props.duration*100)+'%';el('window').style.width=((hi-lo)/props.duration*100)+'%';
+ el('needle').style.left=(value/props.duration*100)+'%';
+ el('range').textContent=format(lo)+' → '+format(hi);
+ el('previous').disabled=!props.offsets.some(t=>t<value);el('next').disabled=!props.offsets.some(t=>t>value);
+ updateAvailability(value);
+}
+function publish(force=false){const value=+el('cursor').value;if(value===lastValue&&!force)return;lastValue=value;send('streamlit:setComponentValue',{value:{offset:value,point_id:selectedPoint,action:force?'select_point':'time',scope:props.scope,serial:Date.now()},dataType:'json'});}
+function updateAvailability(value){
+ if(!map)return;
+ const half=props.width_seconds/2, active=props.frames.filter(f=>Math.abs(f.offset-value)<=half);
+ const cameras=new Set(active.map(f=>f.camera)),points=new Set(active.map(f=>f.point_id));
+ el('image-count').textContent=active.length;el('camera-count').textContent=cameras.size+' / '+(props.camera_total||new Set(props.frames.map(f=>f.camera)).size);el('department-count').textContent=points.size;
+ for(const point of props.points){
+  const marker=markers.get(point.id);if(!marker)continue;
+  const frames=active.filter(f=>f.point_id===point.id),n=new Set(frames.map(f=>f.camera)).size;
+  const element=marker.getElement();
+  element.style.setProperty('--fill',frames.length?'#10b981':'#64748b');
+  element.style.setProperty('--stroke',point.id===selectedPoint?'#f8fafc':(frames.length?'#34d399':'#94a3b8'));
+  element.style.setProperty('--weight',point.id===selectedPoint?'3px':'1px');
+  element.style.setProperty('--size',frames.length?'25px':'18px');
+  const content=document.createElement('div');content.textContent=point.name+' · '+frames.length+' image(s) · '+n+' caméra(s) dans la fenêtre · '+point.location_note;
+  marker.setTooltipContent(content);
+ }
+}
+function updateMap(){
+ if(!map){
+  map=L.map('map',{scrollWheelZoom:true}).setView([46.5,3.5],5);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',maxZoom:19}).addTo(map);
+ }
+ const ids=new Set(props.points.map(p=>p.id));
+ for(const [id,marker] of markers){if(!ids.has(id)){marker.remove();markers.delete(id);}}
+ for(const point of props.points){
+  if(!markers.has(point.id)){
+   const kind=point.source_key==='pyro'?'pyro':'webcams';
+   const icon=L.divIcon({className:'archive-marker',html:'<span class="point-symbol point-'+kind+'"></span>',iconSize:[32,32],iconAnchor:[16,16]});
+   const marker=L.marker([point.lat,point.lon],{icon,title:point.name,alt:point.name,keyboard:true}).addTo(map).bindTooltip('');
+   marker.on('click',()=>{selectedPoint=point.id;paint();publish(true);});markers.set(point.id,marker);
+  }
+  markers.get(point.id).setLatLng([point.lat,point.lon]);
+ }
+ map.invalidateSize({pan:false});
+}
+el('cursor').addEventListener('input',paint);
+el('cursor').addEventListener('pointerdown',()=>{dragging=true});
+window.addEventListener('pointerup',()=>{if(dragging){dragging=false;publish();}});
+el('cursor').addEventListener('change',()=>publish());
+el('previous').onclick=()=>{el('cursor').value=[...props.offsets].reverse().find(t=>t<local)??local;paint();publish();};
+el('next').onclick=()=>{el('cursor').value=props.offsets.find(t=>t>local)??local;paint();publish();};
+window.addEventListener('message',event=>{
+ if(event.source!==parent||event.data.type!=='streamlit:render')return;
+ const old=props;props=event.data.args;
+ el('point-label').textContent='Repères';
+ selectedPoint=props.selected_point;
+ el('cursor').max=props.duration;
+ // Ne pas interrompre le glissement lorsqu'une réponse serveur arrive.
+ if(!dragging){el('cursor').value=props.cursor;local=props.cursor;lastValue=props.cursor;}
+ if(!old||old.start!==props.start||old.end!==props.end||JSON.stringify(old.bins)!==JSON.stringify(props.bins)){
+  lastValue=undefined;
+  const max=Math.max(1,...props.bins);el('bars').replaceChildren(...props.bins.map(n=>{const b=document.createElement('div');b.className='bar';b.style.height=(n?Math.max(5,n/max*100):0)+'%';return b;}));
+ }
+ updateMap();
+ if(!old&&props.points.length){
+  map.fitBounds(L.latLngBounds(props.points.map(p=>[p.lat,p.lon])).pad(.25),{maxZoom:8});
+ }
+ el('start').textContent=format(0);el('end').textContent=format(props.duration);paint();send('streamlit:setFrameHeight',{height:document.body.scrollHeight+3});
+});
+new ResizeObserver(()=>{if(map)map.invalidateSize({pan:false});send('streamlit:setFrameHeight',{height:document.body.scrollHeight+3});}).observe(document.body);
+send('streamlit:componentReady',{apiVersion:1});send('streamlit:setFrameHeight',{height:780});
+</script></body></html>
