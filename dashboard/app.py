@@ -8,12 +8,20 @@ import pydeck as pdk
 import requests
 import streamlit as st
 from PIL import Image, ImageDraw
-from interface import apply_theme, header
+from interface import (
+    MODE_ARCHIVES,
+    MODE_FIRE_HISTORY,
+    MODE_SIMULATION,
+    apply_theme,
+    current_mode,
+    header,
+    section_title,
+)
 
 API_URL = os.getenv("API_URL", "http://localhost:8000")
 REFRESH_S = int(os.getenv("REFRESH_S", "5"))
 
-st.set_page_config(page_title="Pyro-Watch", page_icon="🔥", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="Pyro-Watch", layout="wide", initial_sidebar_state="collapsed")
 
 
 def api(path: str, **kw):
@@ -43,10 +51,11 @@ def live() -> None:
         return
 
     alert_cams = {a["camera_id"] for a in open_alerts}
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Caméras en ligne", f"{sum(c['online'] for c in cameras)} / {len(cameras)}")
-    c2.metric("Alertes ouvertes", len(open_alerts))
-    c3.metric("Caméras avec détection", sum(bool(c["last_detections"]) for c in cameras))
+    with st.container(border=True, key="live_overview"):
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Caméras en ligne", f"{sum(c['online'] for c in cameras)} / {len(cameras)}")
+        c2.metric("Alertes ouvertes", len(open_alerts))
+        c3.metric("Caméras avec détection", sum(bool(c["last_detections"]) for c in cameras))
 
     if cameras:
         df = pd.DataFrame(cameras)
@@ -67,10 +76,10 @@ def live() -> None:
             height=350,
         )
 
-    st.subheader("📹 Flux caméras")
+    section_title("Flux caméras", "Dernières images reçues")
     cols = st.columns(3)
     for i, cam in enumerate(cameras):
-        with cols[i % 3]:
+        with cols[i % 3], st.container(border=True, key=f"cam_{cam['id']}"):
             status = "🔴 ALERTE" if cam["id"] in alert_cams else ("🟢 en ligne" if cam["online"] else "⚫ hors ligne")
             st.markdown(f"**{cam['name']}** — {status}")
             try:
@@ -79,7 +88,7 @@ def live() -> None:
             except requests.RequestException:
                 st.caption("Pas encore d'image")
 
-    st.subheader("🚨 Alertes à qualifier")
+    section_title("Alertes à qualifier", "Confirmez ou écartez les détections")
     if not open_alerts:
         st.success("Aucune alerte ouverte")
     names = {c["id"]: c["name"] for c in cameras}
@@ -96,22 +105,30 @@ def live() -> None:
                 st.write(f"Caméra : **{names.get(a['camera_id'], a['camera_id'])}**")
                 st.write(f"Confiance : **{a['confidence']:.0%}**")
                 st.write(f"Heure : {a['created_at'][:19].replace('T', ' ')} UTC")
-                if st.button("✅ Feu confirmé", key=f"ok{a['id']}"):
+                confirm_col, reject_col = st.columns(2)
+                if confirm_col.button("✅ Feu confirmé", key=f"ok{a['id']}", use_container_width=True):
                     requests.patch(f"{API_URL}/alerts/{a['id']}", json={"status": "confirmed"}, timeout=10)
                     st.rerun()
-                if st.button("❌ Faux positif", key=f"fp{a['id']}"):
+                if reject_col.button("❌ Faux positif", key=f"fp{a['id']}", use_container_width=True):
                     requests.patch(f"{API_URL}/alerts/{a['id']}", json={"status": "false_positive"}, timeout=10)
                     st.rerun()
 
 
 apply_theme()
 header()
-with st.sidebar:
-    st.caption("Espace de travail")
-    mode = st.radio("Mode", ["Carte des archives", "Surveillance simulée"])
-if mode == "Carte des archives":
+mode = current_mode()
+if mode == MODE_ARCHIVES:
     from archives import archives
     archives()
-else:
+elif mode == MODE_SIMULATION:
     st.caption("Démonstration : images synthétiques et détections simulées avec la configuration par défaut.")
     live()
+elif mode == MODE_FIRE_HISTORY:
+    from fire_history import render_fire_history
+    render_fire_history()
+else:
+    st.error(f"Mode de navigation inconnu : {mode}")
+
+st.markdown('<div class="footer"><span>Pyro-Watch · Hackathon Open Data University</span>'
+            '<span>Archives locales · Pyro-SDIS & webcams</span></div>',
+            unsafe_allow_html=True)

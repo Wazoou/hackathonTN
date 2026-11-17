@@ -35,8 +35,10 @@ services:
     environment:
       API_URL: http://api:8000
       ARCHIVE_DIR: /archives
+      FIRE_DATA_PATH: /incendies/Incendies.csv
     volumes:
       - ./archives-data:/archives:ro,z
+      - ./ifm_plus/data/raw/incendies/Incendies.csv:/incendies/Incendies.csv:ro,z
     depends_on: [api]
     restart: unless-stopped
 

@@ -9,6 +9,7 @@ import streamlit as st
 from PIL import Image, ImageDraw
 
 from archive_data import frames_in_window, merge_archives, prepare_frames, sequences
+from interface import section_title
 from timeline_gauge import render as render_gauge
 
 ARCHIVE_DIR = Path(os.getenv("ARCHIVE_DIR", "archives-data"))
@@ -99,8 +100,6 @@ def archives():
     if st.session_state["archive_source"] not in ("all", *collection["sources"]):
         st.session_state["archive_source"] = "all"
     counts = {source: sum(f["source_key"] == source for f in all_frames) for source in collection["sources"]}
-    st.caption(f"{len(all_frames):,} images · {len(collection['cameras'])} caméras · "
-               + " · ".join(f"{SOURCE_LABELS[source]} : {count:,}" for source, count in counts.items()))
     source = st.session_state["archive_source"]
     if source != "all":
         st.caption(f"Source affichée : {SOURCE_LABELS[source]}")
@@ -121,7 +120,7 @@ def archives():
         choose_point(pending["point_id"], collection)
         st.session_state["last_map_serial"] = pending["serial"]
         st.session_state["last_gauge_serial"] = pending["serial"]
-    st.markdown('<div class="eyebrow">Parcours à explorer</div>', unsafe_allow_html=True)
+    section_title("Parcours à explorer", "Choisissez un épisode ou cliquez sur un repère de la carte")
     examples = [p for p in points.values() if p["source_key"] == "webcams"]
     pyro_frames = [f for f in frames if f["source_key"] == "pyro"]
     slots = st.columns(len(examples) + bool(pyro_frames))
@@ -137,18 +136,19 @@ def archives():
         slots[-1].button("Pyro-SDIS · fumée annotée", key="example_pyro", on_click=choose_point,
                         args=(example["point_id"], collection), kwargs={"preferred_camera": example["camera_id"], "focus": example["time"], "narrow": True},
                         use_container_width=True)
-    controls, overview, summary = st.columns([1.4, 1, 2.6])
-    overview.button("↔ Toute la période", on_click=reset_period, args=(collection,), use_container_width=True,
-                    help="Rétablir toute la période pour les sources choisies", key="reset_period")
-    windows = {900: "15 minutes", 3600: "1 heure", 21600: "6 heures", 86400: "1 jour", 604800: "7 jours", 2592000: "30 jours"}
-    with controls.popover("Période et sources", use_container_width=True):
-        width = st.select_slider("Largeur de la fenêtre observée", options=list(windows), value=3600,
-                                 format_func=windows.get, key="archive_window", on_change=stop_playback)
-        st.selectbox("Sources", ["all"] + list(collection["sources"]), format_func=SOURCE_LABELS.get,
-                     key="archive_source", on_change=source_changed, args=(collection,))
-        chosen = st.date_input("Période des archives", min_value=days[0], max_value=days[-1],
-                               key="archive_dates", on_change=stop_playback)
-    summary.caption(f"{SOURCE_LABELS[source]} · fenêtre de {windows[width]} · archives historiques")
+    with st.container(border=True, key="archive_toolbar"):
+        controls, overview, summary = st.columns([1.4, 1, 2.6])
+        overview.button("↔ Toute la période", on_click=reset_period, args=(collection,), use_container_width=True,
+                        help="Rétablir toute la période pour les sources choisies", key="reset_period")
+        windows = {900: "15 minutes", 3600: "1 heure", 21600: "6 heures", 86400: "1 jour", 604800: "7 jours", 2592000: "30 jours"}
+        with controls.popover("Période et sources", use_container_width=True):
+            width = st.select_slider("Largeur de la fenêtre observée", options=list(windows), value=3600,
+                                     format_func=windows.get, key="archive_window", on_change=stop_playback)
+            st.selectbox("Sources", ["all"] + list(collection["sources"]), format_func=SOURCE_LABELS.get,
+                         key="archive_source", on_change=source_changed, args=(collection,))
+            chosen = st.date_input("Période des archives", min_value=days[0], max_value=days[-1],
+                                   key="archive_dates", on_change=stop_playback)
+        summary.caption(f"{SOURCE_LABELS[source]} · fenêtre de {windows[width]} · archives historiques")
     if len(chosen) != 2:
         st.info("Sélectionnez la date de fin de la période.")
         return

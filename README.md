@@ -19,7 +19,15 @@ est indiquée dans les infobulles et sous le lecteur.
 Le filtre facultatif **Toutes les sources / Pyro-SDIS / Webcams** se trouve dans
 **Période et sources**. Les annotations humaines de fumée restent
 disponibles pour Pyro-SDIS ; les webcams sont non annotées et YOLO reste à connecter.
-La surveillance simulée reste accessible dans le sélecteur de mode.
+La navigation permet de passer entre **Webcam**, **Alerte simulée** et
+**Historique des incendies**. Cet historique utilise l’export IFM+ 2025
+`ifm_plus/data/raw/incendies/Incendies.csv` ; les cercles rouges indiquent les communes
+touchées, avec une position approximative dans chaque commune (ou département si le code
+communal manque). La carte se limite à la France métropolitaine ; la frise permet de
+parcourir les mois et actualise les incendies affichés. Le fond OpenStreetMap est le même
+que sur la carte Webcam. L’export actuel couvre 2025.
+Pour Docker Compose, le fichier CSV doit être présent à ce chemin sur l’hôte ; il est
+monté en lecture seule dans le dashboard.
 
 La jauge représente le temps de façon continue, avec un histogramme de disponibilité et un
 curseur déplaçable. La jauge, les compteurs et la carte Leaflet sont conservés dans un même
