@@ -12,7 +12,7 @@ from PIL import Image, ImageDraw
 API_URL = os.getenv("API_URL", "http://localhost:8000")
 REFRESH_S = int(os.getenv("REFRESH_S", "5"))
 
-st.set_page_config(page_title="Pyro-Watch", page_icon="🔥", layout="wide")
+st.set_page_config(page_title="Pyro-Watch", page_icon="🔥", layout="wide", initial_sidebar_state="collapsed")
 
 
 def api(path: str, **kw):
@@ -104,5 +104,12 @@ def live() -> None:
 
 
 st.title("🔥 Pyro-Watch")
-st.caption("Détection précoce de feux de forêt à partir de caméras — MVP hackathon")
-live()
+with st.sidebar:
+    st.caption("Espace de travail")
+    mode = st.radio("Mode", ["Carte des archives", "Surveillance simulée"])
+if mode == "Carte des archives":
+    from archives import archives
+    archives()
+else:
+    st.caption("Démonstration : images synthétiques et détections simulées avec la configuration par défaut.")
+    live()

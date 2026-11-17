@@ -28,6 +28,9 @@ services:
     ports: ["8501:8501"]
     environment:
       API_URL: http://api:8000
+      ARCHIVE_DIR: /archives
+    volumes:
+      - ./archives-data:/archives:ro,z
     depends_on: [api]
     restart: unless-stopped
 
