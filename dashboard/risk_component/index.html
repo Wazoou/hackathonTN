@@ -10,6 +10,11 @@
 <div id="legend" class="legend" aria-label="Légende du risque"></div><p class="muted" id="explanation"></p>
 </section><aside class="side" aria-label="Réglages de la carte">
 <fieldset><label class="block" for="department">Département</label><select id="department" disabled></select></fieldset>
+<p class="muted">Cliquez sur la carte pour consulter la fiche d’un département et les détails de la maille.</p>
+<section id="department-details" aria-label="Fiche du département" hidden style="border:1px solid var(--line);border-radius:8px;padding:12px;margin-bottom:18px;font-size:13px;line-height:1.6">
+<div id="department-summary" aria-live="polite"></div>
+<button id="explore-department" style="margin-top:8px">Explorer ce département</button>
+</section>
 <fieldset id="layers" disabled><legend>Couche affichée</legend></fieldset>
 <fieldset id="modes" disabled><legend>Combinaison</legend><label class="choice"><input type="radio" name="mode" value="multiplicatif" checked>Multiplicatif</label><label class="choice"><input type="radio" name="mode" value="additif">Additif</label></fieldset>
 <fieldset><label class="block" for="weight">Poids du combustible <output id="weight-value">60 %</output></label><input id="weight" type="range" min="0" max="20" step="1" value="12" disabled><p class="muted">Mode additif : le reste correspond à la pression humaine.</p></fieldset>

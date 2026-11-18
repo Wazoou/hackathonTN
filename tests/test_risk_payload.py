@@ -23,6 +23,8 @@ class RiskPayloadTests(unittest.TestCase):
             sig=file_signature(folder); packed=build_payload(sig)
             data=json.loads(gzip.decompress(base64.b64decode(packed['payload'])))
             self.assertEqual(data['features'],features)
+            self.assertEqual([f['properties']['code'] for f in data['department_boundaries']['features']], ['01'])
+            self.assertIn('source',data['department_boundaries'])
             for i,f in enumerate(features):
                 c,h=f['properties']['s_combustible'],f['properties']['s_humain']
                 self.assertEqual(data['scores']['multiplicatif'][i]/10,combine(c,h))
@@ -48,5 +50,16 @@ class RiskPayloadTests(unittest.TestCase):
             Path(folder,'risque_statique_01.geojson').write_text(json.dumps({'features':[f,f]}))
             with self.assertRaisesRegex(ValueError,'dupliquées'):
                 build_payload(file_signature(folder))
+
+    def test_boundaries_cover_all_metropolitan_departments(self):
+        path=Path(__file__).resolve().parents[1]/'dashboard/risk_component/department_boundaries.geojson'
+        boundaries=json.loads(path.read_text())['features']
+        codes=[f['properties']['code'] for f in boundaries]
+        names=json.loads(path.with_name('departments.json').read_text())
+        self.assertEqual(len(codes),96)
+        self.assertEqual(set(codes),set(names))
+        for f in boundaries:
+            self.assertIn(f['geometry']['type'],('Polygon','MultiPolygon'))
+            self.assertTrue(f['geometry']['coordinates'])
 
 if __name__=='__main__':unittest.main()

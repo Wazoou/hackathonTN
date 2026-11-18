@@ -23,6 +23,13 @@ La navigation permet de passer entre **Carte des risques**, **Webcam**,
 **Alerte simulée** et **Historique des incendies**. La carte des risques conserve
 le maillage national, les scores experts et la régression BDIFF lorsqu’elle est calculée,
 avec les réglages interactifs sans rechargement des données.
+Les contours des 96 départements restent visibles au-dessus des mailles. Un clic
+affiche une fiche départementale (effectif, médiane de la couche active et part de
+mailles en classe élevée ou plus), avec un bouton **Explorer ce département**.
+Les détails de la maille cliquée restent accessibles. Les contours IGN sont fournis
+avec le code et simplifiés à 50 m uniquement pour l’affichage ; les géométries du
+maillage et les calculs ne sont pas modifiés. Leur export peut être régénéré depuis
+le cache IGN avec `ifm_plus/.venv/bin/python ml/build_department_boundaries.py`.
 L’historique utilise l’export BDIFF 2025
 `ifm_plus/data/raw/incendies/Incendies.csv` ; les cercles rouges indiquent les communes
 touchées, avec une position approximative dans chaque commune (ou département si le code

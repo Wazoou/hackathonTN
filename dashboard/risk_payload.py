@@ -38,7 +38,10 @@ def build_payload(signature):
         scores[f'additif:{step}'] = [int(round(combine(c, h, 'additif', step / 20) * 10)) for c, h in terms]
     has_proba = bool(features) and all(f['properties'].get('p_feu') is not None for f in features)
     layers = {k: v for k, v in LAYERS.items() if k != 'p_feu' or has_proba}
+    boundaries = json.loads((Path(__file__).parent / 'risk_component/department_boundaries.geojson').read_text())
+    boundaries['features'] = [f for f in boundaries['features'] if f['properties']['code'] in departments]
     data = {'features': features, 'scores': scores, 'departments': departments,
+            'department_boundaries': boundaries,
             'department_names': json.loads((Path(__file__).parent / 'risk_component/departments.json').read_text()),
             'metadata': metadata, 'layers': layers,
             'classes': CLASSES, 'colors': [color(i / 10, 255) for i in range(1001)],

@@ -2,7 +2,7 @@
 const $=id=>document.getElementById(id), R=RiskLogic;
 const send=(type,extra={})=>parent.postMessage({isStreamlitMessage:true,type,...extra},'*');
 const state={dept:'all',layer:'score',mode:'multiplicatif',weight:12,opacity:.7};
-let dataset=null,map=null,version=null,pending=null,frame=null,selected=null,view=null;
+let dataset=null,map=null,version=null,pending=null,frame=null,selected=null,view=null,selectedDept=null;
 let rows=new Map(),bounds=new Map(),deptNumbers=new Map(),statsCache=new Map(),colorsCache=new Map();
 let filterExtension=null,currentColors=null,loadCount=0;
 const fmt=(n,d=0)=>Number(n).toLocaleString('fr-FR',{minimumFractionDigits:d,maximumFractionDigits:d});
@@ -14,12 +14,17 @@ function viewBounds(b){
  const width=$('map').clientWidth,height=$('map').clientHeight;
  return new deck.WebMercatorViewport({width,height}).fitBounds([[b[0],b[1]],[b[2],b[3]]],{padding:40,maxZoom:12});
 }
+function setView(next){
+ view=next;
+ document.body.dataset.view=JSON.stringify(view);
+ // Keep the camera controlled: reapplying initialViewState is ignored when its
+ // values match the previous reset, even after the user has panned or zoomed.
+ if(map)map.setProps({viewState:view});
+}
 function fit(){
  if(!dataset||!map)return;
  const b=bounds.get(state.dept),v=viewBounds(b);
- view={longitude:v.longitude,latitude:v.latitude,zoom:v.zoom,pitch:0,bearing:0};
- document.body.dataset.view=JSON.stringify(view);
- map.setProps({initialViewState:view});
+ setView({longitude:v.longitude,latitude:v.latitude,zoom:v.zoom,pitch:0,bearing:0});
 }
 function featureHTML(f){
  const p=f.properties, v=value(f), e=R.escape;
@@ -55,13 +60,38 @@ function layer(colorKey){
   extensions:[filterExtension],getFilterValue:getFilter,filterRange:range,
   updateTriggers:{getFillColor:colorKey}});
 }
-function stats(){
- const key=`${state.dept}|${state.layer}|${state.layer==='score'?R.scoreKey(state):''}`;
+function departmentLayers(outline=false){
+ return new deck.GeoJsonLayer({id:outline?'department-outlines':'department-picking',
+  data:dataset.department_boundaries.features,pickable:!outline,
+  filled:!outline,stroked:outline,getFillColor:[0,0,0,0],
+  getLineColor:f=>f.properties.code===selectedDept?[20,83,64,255]:[45,64,79,190],
+  getLineWidth:f=>f.properties.code===selectedDept?3:1,lineWidthUnits:'pixels',
+  parameters:{depthTest:false},updateTriggers:{getLineColor:selectedDept,getLineWidth:selectedDept}});
+}
+function renderLayers(){map.setProps({layers:[departmentLayers(),layer(colors()),departmentLayers(true)]});}
+function stats(dept=state.dept){
+ const key=`${dept}|${state.layer}|${state.layer==='score'?R.scoreKey(state):''}`;
  if(!statsCache.has(key)){
   if(statsCache.size>=64)statsCache.delete(statsCache.keys().next().value);
-  statsCache.set(key,R.summary(rows.get(state.dept),state,dataset.scores));
+  statsCache.set(key,R.summary(rows.get(dept),state,dataset.scores));
  }
  return statsCache.get(key);
+}
+function departmentHTML(dept){
+ const s=stats(dept),e=R.escape,unit=state.layer==='p_feu'?' %/an':' / 100';
+ return `<strong>${e(dataset.department_names[dept]||dept)} (${e(dept)})</strong><br>`+
+  `${fmt(s.count)} mailles de 2 km<br>`+
+  `${e(dataset.layers[state.layer])} : médiane <b>${fmt(s.median,state.layer==='p_feu'?2:1)}${unit}</b><br>`+
+  `Mailles en classe élevée ou plus : <b>${fmt(s.high*100,1)} %</b><br>`+
+  '<span class="muted">Synthèse des mailles du département, sans météo du jour.</span>';
+}
+function updateDepartmentDetails(){
+ $('department-details').hidden=!selectedDept;
+ if(selectedDept)$('department-summary').innerHTML=departmentHTML(selectedDept);
+}
+function selectDepartment(dept){
+ if(!rows.has(dept))return;
+ selectedDept=dept;updateDepartmentDetails();renderLayers();
 }
 function updateRanking(s){
  $('value-title').textContent=dataset.layers[state.layer];
@@ -91,8 +121,8 @@ function controls(){
 function update(kind='layer'){
  if(!dataset||!map)return;
  const start=performance.now();
- const key=colors();
- map.setProps({layers:[layer(key)]});controls();
+ if(kind==='department')selectedDept=state.dept==='all'?null:state.dept;
+ renderLayers();controls();
  // Opacity only updates a GPU uniform: no sort, statistics, ranking or Python rerun.
  if(kind!=='opacity'){
   const s=stats();$('count').textContent=fmt(s.count);$('median').textContent=fmt(s.median,state.layer==='p_feu'?1:0)+(state.layer==='p_feu'?' %':'');$('high').textContent=fmt(s.high*100,1)+' %';
@@ -106,6 +136,7 @@ function update(kind='layer'){
    'Indice de sensibilité du terrain, relatif aux départements calculés ensemble. Végétation, relief et pression humaine ; sans météo, ce score n’est pas une probabilité.';
   if($('ranking').open)updateRanking(s);
   if(selected)$('selected').innerHTML=featureHTML(selected);
+  updateDepartmentDetails();
  }
  if(kind==='department'){
   selected=null;$('selected').textContent='Survolez une maille pour ses indicateurs, ou cliquez pour conserver sa fiche.';
@@ -121,6 +152,7 @@ let scheduledKind=null;
 function schedule(kind){scheduledKind=kind;if(frame)return;frame=requestAnimationFrame(()=>{frame=null;update(scheduledKind);});}
 function initialize(data){
  dataset=data;rows=new Map([['all',data.features]]);bounds=new Map();deptNumbers=new Map();statsCache.clear();colorsCache.clear();
+ selected=null;selectedDept=null;
  data.departments.forEach((d,i)=>{deptNumbers.set(d,i);rows.set(d,[]);});
  data.features.forEach((f,i)=>{
   f._index=i;rows.get(f.properties.dept).push(f);
@@ -134,6 +166,7 @@ function initialize(data){
  if(data.layers.p_feu)state.layer='p_feu'; // couche par défaut quand le modèle BDIFF est fourni
  try{Object.assign(state,JSON.parse(sessionStorage.getItem('risk-controls')||'{}'));}catch{}
  if(!rows.has(state.dept))state.dept='all';if(!data.layers[state.layer])state.layer='score';
+ selectedDept=state.dept==='all'?null:state.dept;
  if(!['multiplicatif','additif'].includes(state.mode))state.mode='multiplicatif';
  state.weight=Math.max(0,Math.min(20,Math.round(Number(state.weight)||0)));state.opacity=Math.max(.2,Math.min(1,Number(state.opacity)||.7));
  $('department').replaceChildren();
@@ -153,18 +186,23 @@ function initialize(data){
  document.body.dataset.view=JSON.stringify(view);
  if(map)map.finalize();
  map=new deck.DeckGL({container:'map',map:maplibregl,mapStyle:'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
-  initialViewState:view,controller:true,
-  onViewStateChange:({viewState})=>{view=viewState;document.body.dataset.view=JSON.stringify({longitude:view.longitude,latitude:view.latitude,zoom:view.zoom});},
-  getTooltip:({object})=>object?{html:featureHTML(object),style:{backgroundColor:'white',color:'#253747',fontSize:'12px',maxWidth:'360px'}}:null,
-  onClick:({object})=>{if(object){selected=object;$('selected').innerHTML=featureHTML(object);}},
+  viewState:view,controller:true,
+  onViewStateChange:({viewState})=>setView(viewState),
+  getTooltip:({object})=>object?{html:object.properties.code?departmentHTML(object.properties.code):featureHTML(object),style:{backgroundColor:'white',color:'#253747',fontSize:'12px',maxWidth:'360px'}}:null,
+  onClick:({object})=>{if(object){
+   selectDepartment(object.properties.dept||object.properties.code);
+   selected=object.properties.dept?object:null;
+   $('selected').innerHTML=selected?featureHTML(selected):'Survolez une maille pour ses indicateurs, ou cliquez pour conserver sa fiche.';
+  }},
   onError:fail});
  updateMetadata();update();$('status').hidden=true;document.body.dataset.ready='true';document.body.dataset.loadCount=String(++loadCount);
 }
 $('department').onchange=()=>{state.dept=$('department').value;update('department');};
+$('explore-department').onclick=()=>{if(selectedDept){state.dept=selectedDept;$('department').value=state.dept;update('department');}};
 $('opacity').oninput=()=>{state.opacity=Number($('opacity').value)/100;schedule('opacity');};
 $('weight').oninput=()=>{state.weight=Number($('weight').value);schedule('weight');};
 $('fit').onclick=fit;
-for(const [id,delta] of [['zoom-in',1],['zoom-out',-1]])$(id).onclick=()=>{if(map){view={...view,zoom:Math.max(0,Math.min(18,view.zoom+delta))};document.body.dataset.view=JSON.stringify(view);map.setProps({initialViewState:view});}};
+for(const [id,delta] of [['zoom-in',1],['zoom-out',-1]])$(id).onclick=()=>{if(map)setView({...view,zoom:Math.max(0,Math.min(18,view.zoom+delta))});};
 $('fullscreen').onclick=async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await $('map').requestFullscreen();}catch(e){fail(e);}};
 $('ranking').ontoggle=()=>{if(dataset&&$('ranking').open)updateRanking(stats());};
 window.addEventListener('message',async event=>{
