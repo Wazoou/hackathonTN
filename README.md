@@ -19,7 +19,25 @@ est indiquée dans les infobulles et sous le lecteur.
 Le filtre facultatif **Toutes les sources / Pyro-SDIS / Webcams** se trouve dans
 **Période et sources**. Les annotations humaines de fumée restent
 disponibles pour Pyro-SDIS ; les webcams sont non annotées et YOLO reste à connecter.
-La **Carte de risque** et la surveillance simulée sont accessibles dans le sélecteur de mode.
+La navigation permet de passer entre **Carte des risques**, **Webcam**,
+**Alerte simulée** et **Historique des incendies**. La carte des risques conserve
+le maillage national, les scores experts et la régression BDIFF lorsqu’elle est calculée,
+avec les réglages interactifs sans rechargement des données.
+L’historique utilise l’export BDIFF 2025
+`ifm_plus/data/raw/incendies/Incendies.csv` ; les cercles rouges indiquent les communes
+touchées, avec une position approximative dans chaque commune (ou département si le code
+communal manque). La carte se limite à la France métropolitaine ; les filtres permettent
+de parcourir les mois, les saisons et les causes. Le fond OpenStreetMap est le même
+que sur la carte Webcam. Le dossier des exports est monté en lecture seule dans Docker.
+Pour récupérer l’export public 2025 :
+
+```bash
+ifm_plus/.venv/bin/python ml/download_bdiff.py --debut 2025 --fin 2025 --out ifm_plus/data/raw/incendies
+cp ifm_plus/data/raw/incendies/incendies_2025_2025.csv ifm_plus/data/raw/incendies/Incendies.csv
+```
+
+Ce CSV est local et reste hors Git. Sans ce fichier, l’onglet affiche une indication
+sur les données manquantes ; les autres cartes restent disponibles.
 
 La jauge représente le temps de façon continue, avec un histogramme de disponibilité et un
 curseur déplaçable. La jauge, les compteurs et la carte Leaflet sont conservés dans un même

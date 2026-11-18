@@ -10,7 +10,9 @@ webcams = json.loads(Path("/archives/manifest-webcams.json").read_text())
 with patch("timeline_gauge.render", return_value=None) as gauge:
     at = AppTest.from_file("/app/app.py", default_timeout=30).run()
     assert not at.exception, at.exception
-    assert at.radio[0].value == "Carte des archives"
+    at.button(key="mode_archives").click().run()
+    assert not at.exception, at.exception
+    assert "app_mode" not in at.session_state or at.session_state["app_mode"] == "Carte des archives"
     assert at.selectbox(key="archive_source").value == "all"
     assert len(gauge.call_args.args[5]) == 10
     assert len(gauge.call_args.args[6]) == len(pyro["frames"]) + len(webcams["frames"])
@@ -98,8 +100,25 @@ with patch("timeline_gauge.render", return_value=None) as gauge:
     assert at.session_state["replay_index"] == 6
     next(b for b in at.button if b.label == "← Précédente").click().run()
     assert at.session_state["replay_index"] == 5
-    at.radio[0].set_value("Surveillance simulée").run()
+    at.button(key="mode_simulation").click().run()
     assert not at.exception, at.exception
-    at.radio[0].set_value("Carte des archives").run()
+    assert at.session_state["app_mode"] == "Surveillance simulée"
+    at.button(key="mode_archives").click().run()
     assert not at.exception, at.exception
-    print("Période vide, lecture et retour de simulation : OK")
+    assert at.session_state["app_mode"] == "Carte des archives"
+    at.button(key="mode_fire_history").click().run()
+    assert not at.exception, at.exception
+    assert not at.metric
+    assert not at.radio
+    month_slider = at.select_slider(key="fire_history_month")
+    assert month_slider.value.startswith("2025-")
+    month_slider.set_value("2025-01").run()
+    assert not at.exception, at.exception
+    assert at.session_state["fire_history_month"] == "2025-01"
+    assert at.select_slider(key="fire_history_month").value == "2025-01"
+    at.select_slider(key="fire_history_month").set_value("2025-01").run()
+    assert not at.exception, at.exception
+    assert at.session_state["fire_history_month"] == "2025-01"
+    at.button(key="mode_archives").click().run()
+    assert not at.exception, at.exception
+    print("Période vide, lecture, simulation et historique des incendies : OK")

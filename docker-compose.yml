@@ -36,9 +36,11 @@ services:
       API_URL: http://api:8000
       ARCHIVE_DIR: /archives
       RISK_DIR: /risk
+      FIRE_DATA_PATH: /incendies/Incendies.csv
     volumes:
       - ./archives-data:/archives:ro,z
       - ./risk-data:/risk:ro,z   # python ml/build_static_risk.py --out risk-data
+      - ./ifm_plus/data/raw/incendies:/incendies:ro,z
     depends_on: [api]
     restart: unless-stopped
 

@@ -85,9 +85,19 @@ tar -xzf pyro-watch-images.tar.gz
 docker compose up --build -d api dashboard
 ```
 
-Ouvrez **http://localhost:8501/**. La carte doit annoncer **12 252 images** :
+Ouvrez **http://localhost:8501/** puis l’onglet **Webcam**. La carte doit annoncer **12 252 images** :
 12 223 Pyro-SDIS et 29 images de webcams, avec 10 repères au total.
 Le filtre « Toutes les sources » est sélectionné au départ.
+
+## Historique des incendies 2025
+
+Cet onglet utilise un CSV distinct des images et des scores de risque, également hors Git.
+Partagez `ifm_plus/data/raw/incendies/Incendies.csv` avec le groupe en conservant ce chemin,
+ou récupérez l’export public avec les commandes du README. Docker monte automatiquement
+le dossier `ifm_plus/data/raw/incendies/` ; relancez le dashboard si vous venez de mettre
+à jour sa configuration. Les positions affichées sont approximatives, à l’échelle communale.
+
+## Extraction des images
 
 L’extraction crée `archives-data/manifest.json`, `manifest-webcams.json`, `images/`
 et `webcam-demo/` sous `archives-data/`. Évitez un dossier imbriqué

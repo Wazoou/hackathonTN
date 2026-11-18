@@ -12,7 +12,7 @@ data=json.loads(gzip.decompress(base64.b64decode(payload['payload'])))
 assert len(data['features'])==payload['count']
 assert all(len(s)==payload['count'] for s in data['scores'].values())
 app=AppTest.from_file('/app/app.py',default_timeout=120).run()
-app.sidebar.radio[0].set_value('Carte de risque').run()
+app.button(key='mode_risk_map').click().run()
 assert not app.exception,app.exception
 assert not app.error,app.error
 assert len(app.get('component_instance'))==1
