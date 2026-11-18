@@ -122,8 +122,8 @@ if mode == MODE_RISK_MAP:
     from risk_map import risk_map
     risk_map()
 elif mode == MODE_ARCHIVES:
-    from archives import archives
-    archives()
+    from webcams import webcams
+    webcams()
 elif mode == MODE_SIMULATION:
     st.caption("Démonstration : images synthétiques et détections simulées avec la configuration par défaut.")
     live()

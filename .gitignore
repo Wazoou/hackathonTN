@@ -13,6 +13,8 @@ runs/
 # Images locales de la carte, partagées hors Git
 archives-data/
 risk-data/
+camera-data/cameras.json
+camera-data/cameras.sqlite
 pyro-watch-images.tar.gz
 pyro-watch-risque-france.tar.gz
 pyro-watch-risque-france.tar.gz.sha256

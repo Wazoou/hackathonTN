@@ -35,12 +35,14 @@ services:
     environment:
       API_URL: http://api:8000
       ARCHIVE_DIR: /archives
+      CAMERAS_JSON_PATH: /camera-directory/cameras.json
       RISK_DIR: /risk
       FIRE_DATA_PATH: /incendies/Incendies.csv
       BDIFF_DIR: /bdiff
     volumes:
       - ./archives-data:/archives:ro,z
-      - ${RISK_DATA_DIR:-./risk-data}:/risk:ro,z
+      - ./camera-data:/camera-directory:ro,z
+      - ${RISK_DATA_DIR:-./pyro-watch-risque-france-bdiff/risk-data}:/risk:ro,z
       - ./ifm_plus/data/raw/incendies:/incendies:ro,z
       - ./ifm_plus/data/raw/manual/bdiff:/bdiff:ro,z
     depends_on: [api]

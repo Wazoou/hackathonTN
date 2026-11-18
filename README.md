@@ -14,8 +14,10 @@ locales de `pyro-watch-risque-france-bdiff/risk-data` (96 départements et envir
 140 000 mailles, modèle appris sur les incendies BDIFF 2006–2024). Dans Docker, ce dossier
 est monté en lecture seule ; en lancement local, il est détecté automatiquement.
 La variable `RISK_DIR` permet de choisir un autre dossier de données.
-Le bouton **Webcam** ouvre les archives : Pyro-SDIS et les webcams partagent
-une carte, une timeline et un lecteur. Les deux manifestes locaux restent indépendants ;
+Le bouton **Webcam** donne accès aux flux YouTube géolocalisés et aux archives :
+les webcams générées par l’annuaire apparaissent sur une carte interactive et un clic
+sur un repère ouvre le lecteur du direct ; le mode **Archives enregistrées** conserve
+la carte, la timeline et le lecteur Pyro-SDIS / webcams. Les manifestes d’archives restent indépendants ;
 leur index commun conserve les chemins d’images, dates, sources, splits et annotations.
 Les identifiants sont préfixés par la source pour éviter les collisions.
 L’import actuel représente **12 252 images, 200 identifiants de caméras et 10 repères** :
@@ -173,6 +175,21 @@ Pyro-SDIS est inconnu et la correspondance exacte des heures entre sources n’e
 
 Vérification du parcours après import :
 `docker compose exec -T dashboard python - < tests/check_webcam_ui.py`.
+
+## Annuaire de flux webcam YouTube
+
+Générer l’annuaire avec une clé YouTube Data API et le maillage des risques :
+
+```powershell
+$env:YOUTUBE_API_KEY = "votre-cle-api"
+python ml\build_camera_directory.py --mesh "ifm_plus\data\raw\dfci\dfci_2km.gpkg" --id-column id_carreau_dfci
+```
+
+Par défaut, le script écrit `camera-data/cameras.json` et `camera-data/cameras.sqlite`.
+Le dashboard lit le JSON depuis ce dossier (également monté dans Docker) ; ouvrez
+**Webcam → Flux YouTube**, puis cliquez sur un repère pour lire le direct. Les archives
+restent disponibles sous **Archives enregistrées**. Les flux sont vérifiés comme actifs
+au moment de la génération ; leur disponibilité peut évoluer ensuite.
 
 ## 🔥 IFM+ et carte de risque de départ de feu (prévention)
 
