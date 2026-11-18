@@ -7,6 +7,7 @@ const CELL_DETAILS_ZOOM=7;
 let cameraFrame=null;
 let rows=new Map(),bounds=new Map(),deptNumbers=new Map(),statsCache=new Map(),colorsCache=new Map();
 let filterExtension=null,currentColors=null,renderedLayers=[],loadCount=0,daily=null;
+let timeline=null,weatherVersion=null,weatherPending=null;
 const indicatorKeys=['s_combustible','s_humain','foret_frac','resineux_frac','wui_frac','route_ponderee_km'];
 let nationalIndicators={},indicatorCache=new Map();
 const UNITS={p_feu:[2,' %/an'],p_jour:[2,' / 10 000']};
@@ -14,7 +15,7 @@ const unit=layer=>UNITS[layer]||[1,' / 100'];
 const layerKey=(layer=state.layer)=>layer==='score'?R.scoreKey(state):layer==='p_jour'?`p_jour|${daily?.key}`:layer;
 const fmt=(n,d=0)=>Number(n).toLocaleString('fr-FR',{minimumFractionDigits:d,maximumFractionDigits:d});
 const score=f=>dataset.scores[R.scoreKey(state)][f._index]/10;
-const value=f=>R.value(f,state,dataset.scores);
+const value=f=>state.layer==='p_jour'?daily?.values[f._index]:R.value(f,state,dataset.scores);
 const percent=v=>v==null?'Non disponible':`${fmt(v*100)} %`;
 function fail(error){$('error').hidden=false;$('error').textContent=`La carte n’a pas pu être affichée : ${error.message||error}`;$('status').hidden=true;}
 function viewBounds(b){
@@ -89,7 +90,7 @@ function hoverMap({object}){
  if(dept!==hoveredDept){hoveredDept=dept;updateDepartmentHighlight();}
 }
 function featureHTML(f){
- const p=f.properties, v=value(f), e=R.escape;
+ const p=f.properties, v=value(f), e=R.escape,dayValue=daily?.values[f._index],dayFwi=daily?.fwi?.[f._index];
  return `<b>${e(p.commune)} (${e(p.dept)}) · ${e(p.id)}</b><br>`+
  (v==null||v<0?`<b>${e(dataset.layers[state.layer])} : non disponible</b><br>`:
   `<b>${e(dataset.layers[state.layer])} : ${fmt(v,unit(state.layer)[0])}${unit(state.layer)[1]}</b> (${R.riskClass(v,state.layer)})<br>`)+
@@ -98,8 +99,8 @@ function featureHTML(f){
  `Agriculture ${percent(p.agri_frac)} · routes pondérées ${p.route_ponderee_km==null?'Non disponible':fmt(p.route_ponderee_km,3)+' km'}<br>`+
  `Pente moyenne ${p.pente_moy_deg==null?'Non disponible':fmt(p.pente_moy_deg,3)+'°'}`+
  (p.p_feu==null?'':`<br>Estimation BDIFF : ${fmt(p.p_feu,2)} %/an`)+
- (p.p_jour==null||p.p_jour<0||state.layer==='p_jour'?'':`<br>Risque du ${e(daily.label)} : ${fmt(p.p_jour,2)} / 10 000`)+
- (p.fwi==null||state.layer!=='p_jour'?'':`<br>FWI de la station : ${fmt(p.fwi,1)}`);
+ (dayValue==null||dayValue<0||state.layer==='p_jour'?'':`<br>Risque du ${e(daily.label)} : ${fmt(dayValue,2)} / 10 000`)+
+ (dayFwi==null||dayFwi<0||state.layer!=='p_jour'?'':`<br>FWI de la station : ${fmt(dayFwi,1)}`);
 }
 function colors(){
  const key=layerKey();
@@ -163,7 +164,7 @@ function renderLayers(){
  map.setProps({layers:renderedLayers});
 }
 function stats(dept=state.dept,layer=state.layer){
- const selection={...state,layer};
+ const selection={...state,layer,dailyValues:daily?.values};
  const key=`${dept}|${layerKey(layer)}`;
  if(!statsCache.has(key)){
   if(statsCache.size>=64)statsCache.delete(statsCache.keys().next().value);
@@ -282,16 +283,18 @@ function applyDaily(d){
  }
  if(daily&&daily.key===d.key)return;
  const decode=b64=>new Float32Array(Uint8Array.from(atob(b64),c=>c.charCodeAt(0)).buffer);
- const values=decode(d.values),fwi=d.fwi?decode(d.fwi):null;
+ const values=typeof d.values==='string'?decode(d.values):d.values;
+ const fwi=typeof d.fwi==='string'?decode(d.fwi):d.fwi;
  if(values.length!==dataset.features.length||(fwi&&fwi.length!==values.length))throw new Error('Données météo et maillage incompatibles');
- dataset.features.forEach((f,i)=>{f.properties.p_jour=Number.isFinite(values[i])&&values[i]>=0?values[i]:null;f.properties.fwi=fwi&&Number.isFinite(fwi[i])&&fwi[i]>=0?fwi[i]:null;});
- daily={key:d.key,label:d.label,fires:d.fires||[]};
+ daily={key:d.key,label:d.label,values,fwi,fires:d.fires||[]};
  dataset.layers={p_jour:`Risque du jour (${d.label})`,...Object.fromEntries(Object.entries(dataset.layers).filter(([k])=>k!=='p_jour'))};
  dataset.legends.p_jour=d.legend;
  for(const k of [...statsCache.keys()])if(k.includes('p_jour'))statsCache.delete(k);
  if(!had&&!d.keep_layer)state.layer='p_jour';
  document.body.dataset.dailyKey=d.key;
- renderLayerControls();update('layer');
+ if(!had)renderLayerControls();
+ else {const label=document.querySelector('input[name=layer][value=p_jour]')?.parentElement;if(label)label.lastChild.textContent=dataset.layers.p_jour;}
+ update('layer');
 }
 let scheduledKind=null;
 function schedule(kind){scheduledKind=kind;if(frame)return;frame=requestAnimationFrame(()=>{frame=null;update(scheduledKind);});}
@@ -351,19 +354,43 @@ $('fit').onclick=()=>fit();
 for(const event of ['pointerdown','wheel'])$('map').addEventListener(event,cancelCameraAnimation,{passive:true});
 for(const [id,delta] of [['zoom-in',1],['zoom-out',-1]])$(id).onclick=()=>{if(map)animateView({...view,zoom:Math.max(0,Math.min(18,view.zoom+delta))});};
 $('fullscreen').onclick=async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await $('map').requestFullscreen();}catch(e){fail(e);}};
+async function inflate(payload){
+ const binary=atob(payload),bytes=new Uint8Array(binary.length);
+ for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
+ return new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
+}
+async function installWeather(bundle){
+ if(!bundle){weatherPending=null;weatherVersion=null;timeline?.clear();applyDaily(null);return;}
+ if(bundle.version===weatherVersion||bundle.version===weatherPending)return;
+ weatherPending=bundle.version;
+ const start=performance.now();
+ $('status').hidden=false;$('status').textContent='Chargement de la navigation temporelle…';
+ const data=DailyLogic.unpack(await inflate(bundle.payload));
+ if(weatherPending!==bundle.version)return;
+ if(data.cell_commune.length!==dataset.features.length)throw new Error('Données météo et maillage incompatibles');
+ daily=null;
+ for(const key of [...colorsCache.keys()])if(key.startsWith('p_jour|'))colorsCache.delete(key);
+ for(const key of [...statsCache.keys()])if(key.includes('p_jour|'))statsCache.delete(key);
+ if(!timeline)timeline=DailyControls({onDay:applyDaily});
+ timeline.install(data);weatherVersion=bundle.version;weatherPending=null;
+ document.body.dataset.weatherLoads=String(Number(document.body.dataset.weatherLoads||0)+1);
+ document.body.dataset.weatherLoadMs=(performance.now()-start).toFixed(2);
+ $('status').hidden=true;
+}
+let latestArgs=null;
 window.addEventListener('message',async event=>{
  if(event.source!==parent||event.data.type!=='streamlit:render')return;
- const args=event.data.args;
- if(args.version===version){try{applyDaily(args.daily);}catch(e){fail(e);}return;}
+ const args=event.data.args;latestArgs=args;
+ if(args.version===version){try{await installWeather(args.weather);}catch(e){weatherPending=null;fail(e);}return;}
  if(args.version===pending)return;
  pending=args.version;$('status').hidden=false;$('error').hidden=true;
  try{
-  const bytes=Uint8Array.from(atob(args.payload),c=>c.charCodeAt(0));
-  const stream=new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
-  const data=JSON.parse(await new Response(stream).text());
+  const data=JSON.parse(new TextDecoder().decode(await inflate(args.payload)));
   if(pending!==args.version)return;
-  initialize(data);version=args.version;pending=null;applyDaily(args.daily);
- }catch(e){pending=null;fail(e);}
+  timeline?.clear();weatherVersion=null;weatherPending=null;
+  initialize(data);version=args.version;pending=null;
+  await installWeather(latestArgs.weather);
+ }catch(e){pending=null;weatherPending=null;fail(e);}
 });
 new ResizeObserver(()=>send('streamlit:setFrameHeight',{height:document.body.scrollHeight+8})).observe(document.body);
 send('streamlit:componentReady',{apiVersion:1});send('streamlit:setFrameHeight',{height:900});

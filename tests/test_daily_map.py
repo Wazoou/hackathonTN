@@ -42,6 +42,27 @@ class DailyMapTests(unittest.TestCase):
             chart = m.series(d, pd.Timestamp('2022-07-12'))
             self.assertTrue(pd.isna(chart['Feux BDIFF déclarés'].iloc[-1]))
             self.assertEqual(chart['Feux BDIFF déclarés'].iloc[0], 1)
+            source = folder / 'recent.csv'
+            source.write_text('Année;Numéro;Code INSEE;Département;Nom de la commune;Date de première alerte;Surface parcourue (m2);Nature\n'
+                              '2022;old;33001;33;Commune;2022-07-12 10:00:00;100;Naturelle\n'
+                              '2025;1;33001;33;Commune;2025-08-13 10:00:00;100;Naturelle\n'
+                              '2025;1;33001;33;Commune;2025-08-13 10:00:00;100;Naturelle\n'
+                              '2025;2;33001;33;Commune;2025-08-13 11:00:00;100;Naturelle\n'
+                              '2025;3;97101;971;Outre-mer;2025-12-31 10:00:00;100;Naturelle\n')
+            centers = folder / 'centroids.csv'
+            centers.write_text('Code INSEE,latitude,longitude,precision\n33001,45,-1,commune\n')
+            observations = tuple((str(p), p.stat().st_mtime_ns, p.stat().st_size) for p in (source, centers))
+            with patch.object(m, 'METEO_DIR', folder):
+                updated = m.load_daily(m.meteo_signature(), ('b', 'unmapped', 'a'), observations)
+            self.assertEqual(len(updated['fires']), 3)  # Old fire + two distinct 2025 fires.
+            self.assertEqual(updated['bdiff_end'], pd.Timestamp('2025-08-13'))
+            self.assertEqual(updated['meta'], d['meta'])  # Training metadata is untouched.
+            np.testing.assert_array_equal(updated['z'], d['z'])
+            np.testing.assert_array_equal(updated['fwi'], d['fwi'])
+            same_day, same_expected, same_fires = m.daily_layer(updated, pd.Timestamp('2022-07-12'))
+            self.assertEqual(same_day['values'], first['values'])
+            self.assertEqual(same_expected, .5)
+            self.assertEqual(same_fires, 1)
 
 
 if __name__ == '__main__':

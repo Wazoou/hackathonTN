@@ -1,12 +1,12 @@
 """Persistent national risk map: UI interactions stay in the browser.
 
 Avec ``risk-data/meteo`` (ml/build_daily_risk.py), une couche « Risque du jour » est ajoutée :
-Python ne renvoie à chaque date qu'un tableau de probabilités par maille, jamais les géométries.
+La météo est envoyée une fois ; le curseur et le calcul quotidien restent dans le navigateur.
 """
 import base64
 import json
 import os
-from datetime import date, timedelta
+from datetime import timedelta
 from pathlib import Path
 
 import numpy as np
@@ -15,8 +15,10 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 from daily_data import DAY_BOUNDS, DAY_COLORS, DAY_LABELS
+from daily_payload import build_daily_payload
 from risk_payload import build_payload, file_signature
 from fire_statistics import history_signature
+from fire_history import FIRE_DATA_PATH, CENTROID_PATH, DEPARTMENT_CENTROID_PATH, DATE_COLUMN, load_fire_records
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 BDIFF_RISK_DIR = PROJECT_ROOT / 'pyro-watch-risque-france-bdiff' / 'risk-data'
@@ -29,9 +31,6 @@ DEFAULT_RISK_DIR = (
 RISK_DIR = Path(os.getenv('RISK_DIR', str(DEFAULT_RISK_DIR)))
 BDIFF_DIR = Path(os.getenv('BDIFF_DIR', str(PROJECT_ROOT / 'ifm_plus/data/raw/manual/bdiff')))
 METEO_DIR = RISK_DIR / 'meteo'
-EXAMPLES = {'12/07/2022 · Landiras et La Teste': date(2022, 7, 12),
-            '10/08/2022 · canicule': date(2022, 8, 10),
-            '15/01/2022 · hiver': date(2022, 1, 15)}
 _component = components.declare_component('national_risk_map', path=str(Path(__file__).parent / 'risk_component'))
 
 
@@ -51,8 +50,16 @@ def meteo_signature():
     return tuple((f, (METEO_DIR / f).stat().st_mtime_ns) for f in files)
 
 
+def observation_signature():
+    """Invalidate the weather bundle when the separate, newer BDIFF export changes."""
+    if not FIRE_DATA_PATH.is_file() or not CENTROID_PATH.is_file():
+        return ()
+    return tuple((str(p), p.stat().st_mtime_ns, p.stat().st_size)
+                 for p in (FIRE_DATA_PATH, CENTROID_PATH, DEPARTMENT_CENTROID_PATH) if p.is_file())
+
+
 @st.cache_resource(max_entries=2, show_spinner='Chargement de la météo et du modèle…')
-def load_daily(signature, ids):
+def load_daily(signature, ids, observations=()):
     """Tableaux alignés sur l'ordre des mailles du payload, pour un calcul vectorisé par date."""
     meta = json.loads((METEO_DIR / 'modele.json').read_text(encoding='utf-8'))
     model = meta['modeles'][meta['modele_retenu']]
@@ -69,10 +76,26 @@ def load_daily(signature, ids):
     cell_share = np.array([cells[i][1] if i in cells else 0.0 for i in ids])
     fires = pd.read_csv(METEO_DIR / 'feux_bdiff.csv.gz', dtype={'code_insee': str}, parse_dates=['date'])
     fires['dept'] = fires['code_insee'].str[:2]
+    bdiff_end = pd.Timestamp(meta['bdiff']['fin'])
+    if observations:
+        source, centroids = observations[:2]
+        recent, _ = load_fire_records(source[0], centroids[0], observations, centroids[1])
+        # The precomputed observations already contain the training years. Append only
+        # newer years, preserving distinct fires in the same commune on the same day.
+        recent = recent[(recent[DATE_COLUMN].dt.year > bdiff_end.year)
+                        & (recent['zone'] == 'France métropolitaine')]
+        if not recent.empty:
+            bdiff_end = max(bdiff_end, recent[DATE_COLUMN].max().normalize())
+            located = recent.dropna(subset=['latitude', 'longitude'])
+            extra = pd.DataFrame({'code_insee': located['Code INSEE'],
+                                  'date': located[DATE_COLUMN].dt.normalize(),
+                                  'lon': located['longitude'], 'lat': located['latitude'],
+                                  'dept': located.get('Département', located['Code INSEE'].str[:2]).str.strip().str.zfill(2)})
+            fires = pd.concat([fires, extra], ignore_index=True)
     return {'meta': meta, 'model': model, 'dates': dates, 'z': npz['z'], 'fwi': npz['fwi'],
             'commune_station': commune_station, 'commune_terrain': commune_terrain,
             'cell_commune': cell_commune, 'cell_share': cell_share, 'fires': fires,
-            'bdiff_end': pd.Timestamp(meta['bdiff']['fin'])}
+            'bdiff_end': bdiff_end}
 
 
 def commune_probabilities(d, rows):
@@ -105,34 +128,6 @@ def daily_layer(d, day):
     return layer, float(values[values >= 0].sum() / 1e4), len(fires)
 
 
-def date_controls(d):
-    first, last = max(d['dates'][0].date(), date(2006, 1, 1)), d['dates'][-1].date()
-    if 'daily_date' not in st.session_state or not first <= st.session_state['daily_date'] <= last:
-        st.session_state['daily_date'] = last
-    # Keep the selected date when Streamlit removes the widget on another tab.
-    def choose(value):
-        st.session_state['daily_date'] = value
-        st.session_state['_daily_date_input'] = value
-
-    def remember():
-        st.session_state['daily_date'] = st.session_state['_daily_date_input']
-
-    if '_daily_date_input' not in st.session_state or not first <= st.session_state['_daily_date_input'] <= last:
-        st.session_state['_daily_date_input'] = st.session_state['daily_date']
-    cols = st.columns([1.3, 0.8, 0.9, 2.2])
-    chosen = cols[0].date_input('Date du risque du jour', min_value=first, max_value=last, key='_daily_date_input',
-                                format='DD/MM/YYYY', on_change=remember)
-    cols[1].button('Dernier jour', help=f'{last:%d/%m/%Y}', use_container_width=True,
-                   on_click=choose, args=(last,))
-    with cols[2].popover('Exemples', use_container_width=True):
-        for label, example in EXAMPLES.items():
-            if not first <= example <= last:
-                continue
-            st.button(label, key=f'ex{example}', use_container_width=True,
-                      on_click=choose, args=(example,))
-    return pd.Timestamp(chosen), cols[3]
-
-
 def series(d, day):
     start = max(day - timedelta(days=45), d['dates'][0])
     end = min(day + timedelta(days=45), d['dates'][-1])
@@ -146,6 +141,11 @@ def series(d, day):
     return frame
 
 
+@st.cache_resource(max_entries=2, show_spinner='Préparation de la navigation temporelle…')
+def cached_weather(signature, ids, observations=()):
+    return build_daily_payload(load_daily(signature, ids, observations))
+
+
 def risk_map():
     signature = file_signature(RISK_DIR)
     if not signature:
@@ -153,28 +153,11 @@ def risk_map():
         return
     with st.spinner('Préparation de la carte nationale…'):
         payload = cached_payload(signature, history_signature(BDIFF_DIR), PAYLOAD_FORMAT)
-    daily, context = None, None
+    weather = None
     meteo = meteo_signature()
     if meteo:
-        d = load_daily(meteo, tuple(payload['ids']))
-        day, info = date_controls(d)
-        daily, expected, n_fires = daily_layer(d, day)
-        known = day <= d['bdiff_end']
-        note = '' if known else f" (BDIFF connu jusqu’au {d['bdiff_end']:%d/%m/%Y})"
-        info.markdown(f'<div style="padding-top:30px;font-size:14px">Le {day:%d/%m/%Y} : '
-                      f'<b>{expected:.1f}</b> communes avec au moins un feu '.replace('.', ',', 1) +
-                      f'attendues sur la couverture météo · <b>{n_fires if known else "—"}</b> feux BDIFF déclarés{note}</div>',
-                      unsafe_allow_html=True)
-        context = (d, day)
+        weather = cached_weather(meteo, tuple(payload['ids']), observation_signature())
     else:
         st.caption('La couche quotidienne sera disponible après ajout du dossier risk-data/meteo/ (voir DONNEES_EQUIPE.md).')
-    _component(payload=payload['payload'], version=payload['version'], daily=daily, key='national_risk_map', default=None)
-    if context:
-        d, day = context
-        with st.expander('Risque et feux déclarés autour de cette date'):
-            st.line_chart(series(d, day), height=240)
-            auc = d['meta']['apprentissage']['auc_test']
-            st.caption(f"{d['meta']['apprentissage']['validation'].capitalize()} : AUC "
-                       f"{auc['terrain_et_sous_indices']['auc']:.3f} avec la météo, {auc['terrain_seul']['auc']:.3f} "
-                       f"avec le terrain seul. {d['meta']['meteo']['stations']} stations Météo-France, "
-                       "indice forêt-météo de Van Wagner (1987). Relecture historique : le modèle final est entraîné sur toute la période disponible.")
+    _component(payload=payload['payload'], version=payload['version'], weather=weather,
+               key='national_risk_map', default=None)

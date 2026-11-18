@@ -28,28 +28,29 @@ with tempfile.TemporaryDirectory() as directory:
              z=np.array([[0.], [np.log(3.)]]), fwi=np.array([[10.], [20.]]))
     pd.DataFrame([{'code_insee': '33001', 'date': '2022-07-12', 'lon': -1., 'lat': 45.}]).to_csv(folder / 'feux_bdiff.csv.gz', index=False)
     payload = {'payload': base64.b64encode(gzip.compress(b'{}')).decode(), 'version': 'isolated-weather-fixture', 'ids': ['a', 'b']}
-    with patch.object(m, 'METEO_DIR', folder), patch.object(m, 'cached_payload', return_value=payload):
+    with patch.object(m, 'METEO_DIR', folder), patch.object(m, 'cached_payload', return_value=payload), patch.object(m, 'observation_signature', return_value=()):
         m.load_daily.clear()
         app = AppTest.from_file('/app/app.py', default_timeout=60).run()
         assert not app.exception, app.exception
         assert app.button(key='mode_risk_map') and app.button(key='mode_fire_history')
-        assert len(app.date_input) == 1
+        assert not app.date_input and not app.slider
         assert not any(x.label == 'Mode' for x in app.radio)
         first = json.loads(app.get('component_instance')[0].proto.json_args)
-        assert first['daily']['key'] == '2022-07-13'
         assert first['version'] == payload['version']
-        app.date_input[0].set_value(pd.Timestamp('2022-07-12').date()).run()
-        assert not app.exception, app.exception
-        second = json.loads(app.get('component_instance')[0].proto.json_args)
-        assert second['daily']['key'] == '2022-07-12'
-        assert second['version'] == first['version']
-        assert second['payload'] == first['payload']
-        assert second['daily']['values'] != first['daily']['values']
-        assert len(second['daily']['fires']) == 1
+        assert first['weather']['payload']
+        raw = gzip.decompress(base64.b64decode(first['weather']['payload']))
+        import struct
+        size = struct.unpack('<I', raw[:4])[0]
+        header = json.loads(raw[4:4 + size])
+        assert header['dates'] == ['2022-07-12', '2022-07-13']
+        assert header['fires']['2022-07-12'][0][2] == '33'
+        assert header['arrays']['cell_commune']['length'] == 2
         app.button(key='mode_fire_history').click().run()
         assert not app.exception, app.exception
         assert len(app.get('iframe')) == 1
         app.button(key='mode_risk_map').click().run()
         assert not app.exception, app.exception
-        assert app.date_input[0].value == pd.Timestamp('2022-07-12').date()
-print('Date controls, daily values, stable map payload, top navigation and fire history: OK')
+        second = json.loads(app.get('component_instance')[0].proto.json_args)
+        assert second['weather']['version'] == first['weather']['version']
+        assert second['payload'] == first['payload']
+print('Persistent map and one-time weather bundle: native date controls, observed fires and navigation OK')

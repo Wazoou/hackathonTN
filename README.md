@@ -264,11 +264,23 @@ Quand `risk-data/meteo/` est présent, la **Carte de risque** propose une date p
 couche **Risque du jour** : la **probabilité qu'au moins un feu de forêt démarre dans la journée** dans
 chacune des 139 842 mailles de 2 km des 96 départements. Les feux BDIFF déclarés ce jour-là sont superposés
 (ronds blancs) ; un graphique compare le nombre estimé de communes avec feu et les feux déclarés sur trois mois autour
-de la date. Le bouton **Exemples** ouvre le 12/07/2022 (Landiras, La Teste-de-Buch), le 10/08/2022 (canicule)
-et le 15/01/2022. Changer de date met à jour les valeurs du jour sans recréer la carte ni changer son zoom.
+de la date. Le curseur **Parcourir les dates**, le calendrier et le bouton **Dernier jour**
+fonctionnent directement dans le navigateur et restent synchronisés.
+Le risque est recalculé au pas d’un jour pendant le glissement, sans requête Python,
+sans transfert de données et sans recréer la carte ni changer son zoom. Les incendies
+observés, les statistiques et le graphique suivent la date sélectionnée. Les données
+météo (environ 23 Mo compressés pour le jeu national actuel) sont chargées et
+décompressées une fois à l’ouverture de la carte dans un format binaire sans perte ;
+le modèle utilise exactement les mêmes paramètres qu’en Python. La date est conservée
+dans la session du navigateur lors d’un retour à la carte.
 La navigation actuelle (onglets, contours, mailles opaques, zoom animé et infobulles départementales) est conservée.
 En couche quotidienne, la proportion de mailles à risque dans l’infobulle correspond au jour choisi ;
 la moyenne annuelle BDIFF reste une référence historique. Les mailles sans météo sont grises et exclues des statistiques.
+Les observations de 2025 sont ajoutées depuis `ifm_plus/data/raw/incendies/Incendies.csv`
+(`FIRE_DATA_PATH` dans Docker), sans réentraîner le modèle météo. Les ronds blancs et
+le graphique utilisent ces feux datés, avec des positions approximatives à la commune
+ou au département si nécessaire. Les métadonnées d’apprentissage restent sur 2006–2024 ;
+la borne de disponibilité des observations est calculée séparément.
 
 - **Météo** : données climatologiques quotidiennes Météo-France (data.gouv.fr, sans compte) de
   587 stations ayant TX, humidité minimale, vent moyen et pluie au moins 80 % des jours depuis 2005 ;

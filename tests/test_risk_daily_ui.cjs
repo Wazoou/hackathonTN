@@ -3,7 +3,7 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
 const R=require('../dashboard/risk_component/risk_logic.js');
 const elements=new Map();
 const el=id=>{if(!elements.has(id))elements.set(id,{addEventListener(){}});return elements.get(id);};
-const context=vm.createContext({document:{body:{dataset:{}},getElementById:el},RiskLogic:R,
+const context=vm.createContext({document:{body:{dataset:{}},getElementById:el,querySelector:()=>null},RiskLogic:R,
  parent:{postMessage(){}},window:{addEventListener(){}},ResizeObserver:class{observe(){}},
  atob:s=>Buffer.from(s,'base64').toString('binary'),
  deck:{GeoJsonLayer:class{constructor(props){this.id=props.id;this.props=props;}},

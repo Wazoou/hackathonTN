@@ -11,7 +11,7 @@ function scale(value,layer){
 }
 function riskClass(value,layer){return CLASSES[Math.min(4,Math.max(0,Math.floor(scale(value,layer)/20)))];}
 function scoreKey(state){return state.mode==='multiplicatif'?'multiplicatif':`additif:${state.weight}`;}
-function value(feature,state,scores){return state.layer==='score'?scores[scoreKey(state)][feature._index]/10:feature.properties[state.layer];}
+function value(feature,state,scores){if(state.layer==='p_jour'&&state.dailyValues)return state.dailyValues[feature._index];return state.layer==='score'?scores[scoreKey(state)][feature._index]/10:feature.properties[state.layer];}
 function summary(features,state,scores){
  const values=[],top=[];
  let high=0,total=0;
