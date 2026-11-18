@@ -54,6 +54,18 @@ class BuildTests(unittest.TestCase):
         sparse = build.sample_commune_days(communes, fires, dates, rate=0.1)
         self.assertTrue((sparse.loc[sparse.y == 0, "w"] == 10).all())
 
+    def test_build_weather_term_matches_dashboard(self):
+        frame = pd.DataFrame([DAY, {**DAY, "ffmc": 70.0, "isi": 1.0}])
+        np.testing.assert_allclose(build.weather_z(MODEL, frame), weather_term(MODEL, frame))
+
+    def test_binomial_sampling_rate(self):
+        communes = pd.DataFrame(index=[f"{i:05d}" for i in range(400)])
+        dates = pd.date_range("2020-01-01", periods=500, freq="D")
+        empty = pd.DataFrame({"code_insee": [], "date": pd.to_datetime([])})
+        sample = build.sample_commune_days(communes, empty, dates, rate=0.01, seed=1)
+        self.assertAlmostEqual(len(sample) / (400 * 500), 0.01, delta=0.002)   # ≈ 2 000 lignes
+        self.assertAlmostEqual(sample["w"].sum(), 400 * 500, delta=400 * 500 * 0.2)
+
     def test_gap_filled_from_nearest_station(self):
         dates = pd.date_range("2020-07-01", periods=3, freq="D")
         rows = []

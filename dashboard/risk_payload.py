@@ -49,4 +49,5 @@ def build_payload(signature):
     compressed = gzip.compress(raw, compresslevel=6, mtime=0)
     return {'version': hashlib.sha256(raw).hexdigest(),
             'payload': base64.b64encode(compressed).decode(), 'count': len(features),
-            'departments': len(departments), 'raw_bytes': len(raw), 'compressed_bytes': len(compressed)}
+            'departments': len(departments), 'raw_bytes': len(raw), 'compressed_bytes': len(compressed),
+            'ids': ids}  # ordre des mailles dans le payload (non envoyé au navigateur)

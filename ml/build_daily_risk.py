@@ -22,8 +22,11 @@ Méthode
    modèle maille par maille surestimerait le total (~1,7×), car le coefficient du terrain
    est inférieur à 1 ; la répartition garde la calibration communale.
 
+Sorties (``risk-data/meteo``) : ``meteo.npz`` (partie météo du modèle et FWI, jour × station),
+``communes.json``, ``mailles.json``, ``stations.json``, ``feux_bdiff.csv.gz`` et ``modele.json``.
+
     python ml/build_daily_risk.py --risk-data risk-data --features dfci_2km_features_france.parquet \
-        --meteo ifm_plus/data/raw/meteo --bdiff ifm_plus/data/raw/manual/bdiff --departements 06 07 13 33 34 40 83
+        --meteo ifm_plus/data/raw/meteo --bdiff ifm_plus/data/raw/manual/bdiff
 """
 import argparse
 import io
@@ -56,26 +59,40 @@ def _fwi_module():
 
 # ---------------------------------------------------------------- météo
 
-def read_meteo(folder: Path, depts, start=START) -> pd.DataFrame:
-    """Une ligne par station-jour : TX (°C), UN (%), vent (km/h), RR (mm)."""
+def read_meteo(folder: Path, start=START, min_share=0.8, depts=None) -> pd.DataFrame:
+    """Station-jours TX (°C), UN (%), vent (km/h), RR (mm) des stations assez complètes.
+
+    Lecture département par département : seules les stations qui ont les quatre mesures
+    au moins ``min_share`` des jours depuis ``start`` sont gardées, pour tenir en mémoire
+    à l'échelle nationale (fichiers historiques depuis 1950).
+    """
+    codes = sorted({p.name.split("_")[1] for p in folder.glob("Q_*_RR-T-Vent.csv.gz")})
+    codes = [c for c in codes if depts is None or c in depts]
+    if not codes:
+        raise FileNotFoundError(f"Aucune donnée Météo-France dans {folder}")
+    begin = int(pd.Timestamp(start).strftime("%Y%m%d"))
     frames = []
-    for dept in depts:
-        main, other = [], []
-        for path in sorted(folder.glob(f"Q_{dept}_*_RR-T-Vent.csv.gz")):
-            main.append(pd.read_csv(path, sep=";", usecols=["NUM_POSTE", "NOM_USUEL", "LAT", "LON",
-                                                             "AAAAMMJJ", "RR", "TX", "FFM"]))
-        for path in sorted(folder.glob(f"Q_{dept}_*_autres-parametres.csv.gz")):
-            other.append(pd.read_csv(path, sep=";", usecols=["NUM_POSTE", "AAAAMMJJ", "UN"]))
-        if not main or not other:
-            raise FileNotFoundError(f"Données Météo-France absentes pour le département {dept} dans {folder}")
-        a, b = pd.concat(main), pd.concat(other)
-        frames.append(a.merge(b, on=["NUM_POSTE", "AAAAMMJJ"], how="left").assign(dept=dept))
-    data = pd.concat(frames, ignore_index=True)
-    data["date"] = pd.to_datetime(data["AAAAMMJJ"].astype(str), format="%Y%m%d")
-    data = data[data["date"] >= start].drop_duplicates(["NUM_POSTE", "date"])
-    return pd.DataFrame({"station": data["NUM_POSTE"].astype(str).str.zfill(8), "nom": data["NOM_USUEL"],
-                         "lat": data["LAT"], "lon": data["LON"], "dept": data["dept"], "date": data["date"],
-                         "temp": data["TX"], "rh": data["UN"], "wind": data["FFM"] * 3.6, "rain": data["RR"]})
+    for dept in codes:
+        main = [pd.read_csv(p, sep=";", usecols=["NUM_POSTE", "NOM_USUEL", "LAT", "LON", "AAAAMMJJ", "RR", "TX", "FFM"])
+                for p in sorted(folder.glob(f"Q_{dept}_*_RR-T-Vent.csv.gz"))]
+        other = [pd.read_csv(p, sep=";", usecols=["NUM_POSTE", "AAAAMMJJ", "UN"])
+                 for p in sorted(folder.glob(f"Q_{dept}_*_autres-parametres.csv.gz"))]
+        if not other:
+            raise FileNotFoundError(f"Humidité (autres-parametres) absente pour le département {dept}")
+        a = pd.concat(main)
+        a = a[a["AAAAMMJJ"] >= begin]
+        b = pd.concat(other)
+        b = b[b["AAAAMMJJ"] >= begin]
+        data = a.merge(b, on=["NUM_POSTE", "AAAAMMJJ"], how="left").drop_duplicates(["NUM_POSTE", "AAAAMMJJ"])
+        data["date"] = pd.to_datetime(data["AAAAMMJJ"].astype(str), format="%Y%m%d")
+        n_days = (data["date"].max() - pd.Timestamp(start)).days + 1
+        share = data.groupby("NUM_POSTE")[["TX", "UN", "FFM", "RR"]].count().min(axis=1) / n_days
+        data = data[data["NUM_POSTE"].isin(share[share >= min_share].index)]
+        frames.append(pd.DataFrame({
+            "station": data["NUM_POSTE"].astype(str).str.zfill(8), "nom": data["NOM_USUEL"], "lat": data["LAT"],
+            "lon": data["LON"], "dept": dept, "date": data["date"], "temp": data["TX"], "rh": data["UN"],
+            "wind": data["FFM"] * 3.6, "rain": data["RR"]}))
+    return pd.concat(frames, ignore_index=True)
 
 
 def select_stations(meteo: pd.DataFrame, min_share=0.8) -> pd.DataFrame:
@@ -92,6 +109,15 @@ def distance_km(lat1, lon1, lat2, lon2):
     dx = np.radians(np.asarray(lon2)[None, :] - np.asarray(lon1)[:, None]) * np.cos(lat)
     dy = np.radians(np.asarray(lat2)[None, :] - np.asarray(lat1)[:, None])
     return 6371.0 * np.hypot(dx, dy)
+
+
+def nearest(lat, lon, stations: pd.DataFrame, chunk=4000) -> np.ndarray:
+    """Identifiant de la station la plus proche, par paquets pour limiter la mémoire."""
+    lat, lon = np.asarray(lat), np.asarray(lon)
+    best = np.empty(len(lat), dtype=int)
+    for i in range(0, len(lat), chunk):
+        best[i:i + chunk] = distance_km(lat[i:i + chunk], lon[i:i + chunk], stations.lat, stations.lon).argmin(axis=1)
+    return stations.index.to_numpy()[best]
 
 
 def station_indices(meteo: pd.DataFrame, stations: pd.DataFrame) -> pd.DataFrame:
@@ -145,16 +171,35 @@ def transform(frame: pd.DataFrame) -> pd.DataFrame:
 
 
 def sample_commune_days(communes: pd.DataFrame, fire_days: pd.DataFrame, dates, rate, seed=0) -> pd.DataFrame:
-    """Tous les jours avec feu, et une fraction ``rate`` des autres jours (poids 1/rate)."""
+    """Tous les jours avec feu, et en moyenne une fraction ``rate`` des autres jours (poids 1/rate).
+
+    Le nombre de jours tirés par commune suit une loi binomiale : on ne construit jamais la grille
+    complète commune × jour (≈ 240 millions de lignes pour la France).
+    """
     rng = np.random.default_rng(seed)
-    n = len(communes) * len(dates)
-    picks = rng.random(n) < rate
-    rows = pd.DataFrame({"code_insee": np.repeat(communes.index.to_numpy(), len(dates))[picks],
-                         "date": np.tile(np.asarray(dates), len(communes))[picks]})
+    dates = np.asarray(dates)
+    ids = communes.index.to_numpy()
+    if rate >= 1:
+        rows = pd.DataFrame({"code_insee": np.repeat(ids, len(dates)), "date": np.tile(dates, len(ids))})
+    else:
+        counts = rng.binomial(len(dates), rate, size=len(ids))
+        rows = pd.DataFrame({"code_insee": np.repeat(ids, counts),
+                             "date": dates[rng.integers(0, len(dates), size=counts.sum())]})
     positives = fire_days[["code_insee", "date"]].drop_duplicates().assign(y=1, w=1.0)
     rows = rows.merge(positives[["code_insee", "date"]], how="left", indicator=True)
-    rows = rows[rows["_merge"] == "left_only"].drop(columns="_merge").assign(y=0, w=1.0 / rate)
+    rows = rows[rows["_merge"] == "left_only"].drop(columns="_merge").assign(y=0, w=1.0 / min(rate, 1.0))
     return pd.concat([positives, rows], ignore_index=True)
+
+
+def weather_z(model: dict, indices: pd.DataFrame) -> np.ndarray:
+    """Constante + partie météo du modèle (identique à dashboard/daily_data.weather_term)."""
+    total = np.full(len(indices), model["intercept"], dtype=float)
+    for name, coef in model["coefficients"].items():
+        if name == "log_terrain":
+            continue
+        values = indices["ffmc"] / 100.0 if name == "ffmc_100" else np.log1p(indices[name.removeprefix("log_")].clip(lower=0))
+        total += coef * values.to_numpy()
+    return total
 
 
 def fit_daily(table: pd.DataFrame, split_year: int):
@@ -182,14 +227,21 @@ def main():
     parser.add_argument("--features", type=Path, required=True, help="Table nationale (id_carreau_dfci, code_insee)")
     parser.add_argument("--meteo", type=Path, required=True)
     parser.add_argument("--bdiff", type=Path, required=True)
-    parser.add_argument("--departements", nargs="+", required=True)
+    parser.add_argument("--departements", nargs="+",
+                        help="Départements des mailles (défaut : tous les risque_statique_*.geojson de --risk-data)")
     parser.add_argument("--fin-apprentissage", type=int, default=2018, help="Dernière année d'apprentissage")
-    parser.add_argument("--taux-negatifs", type=float, default=0.02)
+    parser.add_argument("--taux-negatifs", type=float, default=0.005,
+                        help="Part des communes-jours sans feu tirées pour l'apprentissage")
+    parser.add_argument("--min-completude", type=float, default=0.8)
+    parser.add_argument("--meteo-departements", nargs="+",
+                        help="Fichiers Météo-France à lire (défaut : tous ceux de --meteo)")
     args = parser.parse_args()
 
-    # Mailles du pilote : p_feu (déjà publié), commune et centre.
+    # Mailles : p_feu (déjà publié), commune et centre.
+    depts = args.departements or sorted(p.stem.removeprefix("risque_statique_")
+                                        for p in args.risk_data.glob("risque_statique_*.geojson"))
     cells = []
-    for dept in args.departements:
+    for dept in depts:
         path = args.risk_data / f"risque_statique_{dept}.geojson"
         for f in json.loads(path.read_text(encoding="utf-8"))["features"]:
             p = f["properties"]
@@ -207,13 +259,12 @@ def main():
     communes["log_terrain"] = np.log(communes["rate"])
 
     # Météo et FWI.
-    meteo = read_meteo(args.meteo, args.departements)
-    stations = select_stations(meteo)
+    meteo = read_meteo(args.meteo, min_share=args.min_completude, depts=args.meteo_departements)
+    stations = select_stations(meteo, args.min_completude)
     print(f"{len(stations)} stations retenues sur {meteo['station'].nunique()} ;"
           f" du {meteo['date'].min():%d/%m/%Y} au {meteo['date'].max():%d/%m/%Y}")
     indices = station_indices(meteo, stations)
-    sid = np.array(stations.index)
-    communes["station"] = sid[distance_km(communes.lat, communes.lon, stations.lat, stations.lon).argmin(axis=1)]
+    communes["station"] = nearest(communes.lat, communes.lon, stations)
     cells["part"] = cells["rate"] / cells["code_insee"].map(communes["rate"])
 
     # Feux datés et échantillon commune-jour.
@@ -233,9 +284,16 @@ def main():
     # Sorties pour le dashboard.
     out = args.risk_data / "meteo"
     out.mkdir(parents=True, exist_ok=True)
-    keep = indices.dropna(subset=["fwi"]).copy()
-    keep[INDICES] = keep[INDICES].round(2)
-    keep.assign(date=keep["date"].dt.strftime("%Y-%m-%d")).to_csv(out / "indices.csv.gz", index=False)
+    published = models["terrain_et_sous_indices"]
+    days = pd.DatetimeIndex(sorted(indices["date"].unique()))
+    ids = list(stations.index)
+    grid = lambda values: (pd.DataFrame({"date": indices["date"], "station": indices["station"], "v": values})
+                           .pivot(index="date", columns="station", values="v").reindex(index=days, columns=ids)
+                           .to_numpy(dtype=np.float32))
+    np.savez_compressed(out / "meteo.npz", dates=days.strftime("%Y-%m-%d").to_numpy().astype("U10"),
+                        stations=np.array(ids, dtype="U8"),
+                        z=grid(weather_z(published, indices)), fwi=grid(indices["fwi"].round(1).to_numpy()))
+    (out / "indices.csv.gz").unlink(missing_ok=True)  # ancien format
     stations.reset_index().to_json(out / "stations.json", orient="records", force_ascii=False, indent=1)
     (out / "mailles.json").write_text(json.dumps(
         {i: [c, round(float(p), 6)] for i, c, p in zip(cells["id"], cells["code_insee"], cells["part"])}), encoding="utf-8")
@@ -247,7 +305,7 @@ def main():
     fires_out.assign(date=fires_out["date"].dt.strftime("%Y-%m-%d"), lon=fires_out["lon"].round(4),
                      lat=fires_out["lat"].round(4)).to_csv(out / "feux_bdiff.csv.gz", index=False)
     meta = {
-        "departements": args.departements, "genere_le": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "departements": depts, "genere_le": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "meteo": {"source": "Météo-France, données climatologiques de base quotidiennes (data.gouv.fr)",
                   "variables": "TX (°C), UN (%), FFM (m/s -> km/h), RR (mm)",
                   "stations": len(stations), "debut": f"{indices['date'].min():%Y-%m-%d}",

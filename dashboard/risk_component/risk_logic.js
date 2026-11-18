@@ -2,9 +2,10 @@
 (function(root){
 'use strict';
 const CLASSES=['Très faible','Faible','Modéré','Élevé','Très élevé'];
+const BOUNDS={p_feu:[0,2,5,10,20,40],p_jour:[0,0.5,2,5,15,50]}; // %/an ; pour 10 000 par jour
 function scale(value,layer){
- if(layer!=='p_feu')return value;
- const b=[0,2,5,10,20,40];
+ const b=BOUNDS[layer];
+ if(!b)return value;
  for(let i=0;i<5;i++)if(value<b[i+1])return 20*i+20*(value-b[i])/(b[i+1]-b[i]);
  return 100;
 }

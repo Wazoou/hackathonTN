@@ -108,18 +108,14 @@ apply_theme()
 header()
 with st.sidebar:
     st.caption("Espace de travail")
-    views = {"risk": 1, "daily": 2}
-    mode = st.radio("Mode", ["Carte des archives", "Carte de risque", "Risque du jour", "Surveillance simulée"],
-                    index=views.get(st.query_params.get("view"), 0))
+    mode = st.radio("Mode", ["Carte des archives", "Carte de risque", "Surveillance simulée"],
+                    index=1 if st.query_params.get("view") in ("risk", "daily") else 0)
 if mode == "Carte des archives":
     from archives import archives
     archives()
 elif mode == "Carte de risque":
     from risk_map import risk_map
     risk_map()
-elif mode == "Risque du jour":
-    from daily_risk import daily_risk
-    daily_risk()
 else:
     st.caption("Démonstration : images synthétiques et détections simulées avec la configuration par défaut.")
     live()
