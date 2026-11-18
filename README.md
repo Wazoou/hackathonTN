@@ -148,7 +148,7 @@ et pression humaine (BD TOPO, trafic, RPG). Le volet est **statique** : aucune c
 
 | Couche | Contenu |
 |---|---|
-| **Probabilité annuelle de départ (BDIFF)** | Probabilité qu’au moins un feu de forêt démarre dans l’année dans le carreau, apprise sur l’historique BDIFF (médiane 5,5 %, maximum 60 % autour de Marseille). Classes : < 2 %, 2–5 %, 5–10 %, 10–20 %, ≥ 20 %. |
+| **Probabilité annuelle de départ (BDIFF)** | Probabilité qu’au moins un feu de forêt démarre dans l’année dans le carreau, apprise sur l’historique BDIFF (France : médiane 0,9 %, 90 % des mailles sous 4,3 %, maximum 32 % à Lacanau). Couche affichée par défaut quand elle est disponible. Classes : < 2 %, 2–5 %, 5–10 %, 10–20 %, ≥ 20 %. |
 | **Score de risque (expert)** | Score 0–100 à poids fixés à dire d’expert, combinaison multiplicative ou additive réglable. |
 | **Combustible et relief** | Sous-score 0–100 : résineux 40 %, forêt 25 %, lisières 15 %, pente 10 %, pins 10 %. |
 | **Pression humaine** | Sous-score 0–100 : habitat à moins de 200 m de la forêt (WUI) 40 %, routes pondérées 25 %, trafic 20 %, agriculture 15 %. |
@@ -168,28 +168,37 @@ Le score classe les carreaux entre eux ; ce n’est pas une probabilité.
 
 ### Probabilité apprise sur l’historique BDIFF
 
-Une **régression logistique** apprend les poids à partir des 18 088 feux de forêt BDIFF 2006–2024
-rattachés aux communes des 7 départements. BDIFF localise chaque feu à la **commune**, pas au point :
-l’unité d’apprentissage est la commune-année (1 si au moins un feu dans l’année), décrite par la moyenne
-des 9 indicateurs du score expert sur ses carreaux et par le logarithme de sa surface. Le modèle est
-ensuite appliqué à chaque carreau, avec ses propres indicateurs et la surface d’un carreau.
+Une **régression logistique** apprend les poids à partir des feux de forêt BDIFF 2006–2024.
+BDIFF localise chaque feu à la **commune**, pas au point : l’unité d’apprentissage est la
+commune-année (1 si au moins un feu dans l’année), décrite par la moyenne des indicateurs du score
+expert sur ses carreaux et par le logarithme de sa surface. Le modèle est ensuite appliqué à chaque
+carreau, avec ses propres indicateurs et la surface d’un carreau.
+
+**Modèle national** (96 départements, 33 373 communes, 48 203 feux rattachés, trafic exclu) :
 
 | AUC (validation croisée) | Communes inconnues | Département inconnu |
 |---|---:|---:|
-| Régression logistique (9 indicateurs + surface) | **0,757** | **0,724** |
-| Score expert + surface | 0,731 | 0,714 |
-| Surface seule | 0,714 | 0,701 |
+| Régression logistique (8 indicateurs + surface) | **0,830** | **0,818** |
+| Score expert + surface | 0,804 | 0,798 |
+| Surface seule | 0,726 | 0,696 |
 
-Coefficients (indicateurs 0–1) : résineux +4,7, pins −3,9 (les deux sont très corrélés, effet net
-du pin ≈ +0,9), WUI +0,8, lisières +0,8, trafic +0,6, pente +0,6, routes +0,2, forêt −0,2,
-agriculture −1,7, log(surface) +1,0. Le score expert avait les bons signes, sauf pour l’agriculture,
-qui réduit nettement le risque.
+Coefficients (indicateurs 0–1) : lisières +1,9, résineux +0,8, pins +0,4, forêt +0,4,
+WUI ≈ 0, pente −0,4, routes −1,1, agriculture −3,3, log(surface) +0,9. Le modèle retient surtout
+l’opposition entre massifs forestiers fragmentés (beaucoup de lisières, résineux) et plaines agricoles
+ou zones urbanisées. Une partie de l’AUC nationale vient du contraste entre régions : à l’intérieur
+d’un même département, l’AUC médiane n’est que de 0,68 (quartiles 0,64–0,75 sur 81 départements
+ayant au moins 20 communes-années avec feu).
+
+**Pilote à 7 départements** (06, 07, 13, 33, 34, 40, 83 ; 18 088 feux) : AUC 0,757 (communes
+inconnues) et 0,724 (département inconnu), contre 0,731 et 0,714 pour le score expert + surface.
+Résineux +4,7 et pins −3,9 (très corrélés, effet net du pin ≈ +0,9), WUI +0,8, lisières +0,8,
+agriculture −1,7. Les poids diffèrent du modèle national : ils dépendent de la zone d’apprentissage.
 
 Limites : rattachement des carreaux et des feux à la commune (on suppose les carreaux d’une commune
-semblables), communes trop petites pour contenir un centroïde de carreau ignorées (< 1 % des feux),
-qualité de saisie BDIFF variable selon les départements, risque moyen sur l’année sans météo.
-Un essai avec les points chauds satellite NASA FIRMS a été écarté : ils mêlent brûlages agricoles
-et sites industriels, et ne prédisaient pas mieux que le hasard hors Gironde.
+semblables), communes trop petites pour contenir un centroïde de carreau ignorées (environ 4 % des feux
+au niveau national), qualité de saisie BDIFF variable selon les départements, risque moyen sur l’année
+sans météo. Un essai avec les points chauds satellite NASA FIRMS a été écarté : ils mêlent brûlages
+agricoles et sites industriels, et ne prédisaient pas mieux que le hasard hors Gironde.
 
 Les réglages de la carte nationale sont appliqués directement dans le navigateur : opacité,
 couches, pondérations et départements ne rechargent plus les géométries. Voir le
@@ -208,18 +217,20 @@ par identifiant et calculer tous les départements ensemble :
 ifm_plus/.venv/bin/python ml/build_static_risk.py \
   --features ifm_plus/data/processed/dfci_2km_features_france.parquet \
   --grid ifm_plus/data/processed/dfci_2km_grid_france_metro.parquet \
-  --exclude tmja_max --out risk-data
+  --exclude tmja_max --out risk-data \
+  --bdiff ifm_plus/data/raw/manual/bdiff   # régression logistique nationale (couche p_feu), ~1 min
 docker compose up --build -d --no-deps dashboard
 ```
 
 Ouvrir ensuite <http://localhost:8501/?view=risk>. Ce calcul couvre les 139 842 mailles
-des 96 départements, sans météo ni régression BDIFF. Le trafic mesuré est exclu car
+des 96 départements, sans météo. Le trafic mesuré est exclu car
 il manque pour 99,1 % des mailles : les poids de pression humaine sont renormalisés
 sur l’habitat proche des forêts, les routes et l’agriculture. Les exclusions, sources
-et valeurs manquantes sont enregistrées dans les métadonnées. Les résultats du pilote
-BDIFF à 7 départements décrits ci-dessus ne constituent pas une validation nationale.
+et valeurs manquantes sont enregistrées dans les métadonnées, ainsi que les coefficients
+et les AUC de la régression. Sans `--bdiff`, la couche de probabilité n’est pas produite.
+L’export BDIFF se récupère avec `ml/download_bdiff.py` (voir ci-dessous).
 
-Les fichiers produits (`risk-data/`, environ 8 Mo) sont ignorés par Git ; on peut aussi les partager
+Les fichiers produits (`risk-data/`, environ 8 Mo pour 7 départements, 75 Mo pour la France) sont ignorés par Git ; on peut aussi les partager
 directement et les déposer à la racine du dépôt.
 
 ```bash

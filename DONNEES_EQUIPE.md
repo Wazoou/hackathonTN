@@ -37,7 +37,18 @@ L'archive inclut :
 Les deux fichiers Parquet permettent aussi de recalculer les scores avec la commande
 du README, sans les couches géographiques brutes. Pour modifier la manière dont les
 indicateurs eux-mêmes sont construits, ces couches brutes peuvent en revanche être nécessaires.
-La météo et un modèle BDIFF national ne sont pas inclus.
+La météo et la couche de probabilité BDIFF ne sont pas incluses. Pour ajouter la régression
+logistique nationale à partir des deux fichiers Parquet (environ 1 min, BDIFF téléchargé
+automatiquement depuis le portail, ~5 Mo) :
+
+```bash
+ifm_plus/.venv/bin/pip install -r ifm_plus/requirements.txt scikit-learn
+ifm_plus/.venv/bin/python ml/download_bdiff.py --out ifm_plus/data/raw/manual/bdiff
+ifm_plus/.venv/bin/python ml/build_static_risk.py \
+  --features ifm_plus/data/processed/dfci_2km_features_france.parquet \
+  --grid ifm_plus/data/processed/dfci_2km_grid_france_metro.parquet \
+  --exclude tmja_max --out risk-data --bdiff ifm_plus/data/raw/manual/bdiff
+```
 
 Si vous avez déjà des résultats locaux à conserver, renommez votre dossier `risk-data/`
 et sauvegardez les fichiers nationaux de `ifm_plus/data/processed/` avant extraction.

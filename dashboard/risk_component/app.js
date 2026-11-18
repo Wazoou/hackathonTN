@@ -131,6 +131,7 @@ function initialize(data){
    bounds.set(d,b);
   }
  });
+ if(data.layers.p_feu)state.layer='p_feu'; // couche par défaut quand le modèle BDIFF est fourni
  try{Object.assign(state,JSON.parse(sessionStorage.getItem('risk-controls')||'{}'));}catch{}
  if(!rows.has(state.dept))state.dept='all';if(!data.layers[state.layer])state.layer='score';
  if(!['multiplicatif','additif'].includes(state.mode))state.mode='multiplicatif';
