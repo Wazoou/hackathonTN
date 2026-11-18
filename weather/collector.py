@@ -23,6 +23,7 @@ from dashboard.daily_data import weather_term
 from dashboard.daily_payload import model_signature
 from ml.fwi import step
 from weather.storage import Store, unpack
+from weather.meteofrance import MeteoFrance
 
 LOG = logging.getLogger('weather')
 PARIS = ZoneInfo('Europe/Paris')
@@ -50,7 +51,7 @@ def evolve(model, state, weather, dates):
 
 
 class Collector:
-    def __init__(self, risk_dir, data_dir, session=None, clock=None, sleep=time.sleep):
+    def __init__(self, risk_dir, data_dir, session=None, clock=None, sleep=time.sleep, backfill=None):
         self.meteo = Path(risk_dir) / 'meteo'
         self.folder = Path(data_dir)
         self.public = self.folder / 'public'
@@ -66,6 +67,8 @@ class Collector:
             self.history_end = str(history['dates'][-1])
         by_id = {row['station']: row for row in self.station_info}
         self.station_info = [by_id[key] for key in self.ids]
+        self.backfill = backfill or MeteoFrance(self.station_info, self.folder/'meteo-france',
+            local=os.getenv('MF_DATA_DIR', 'ifm_plus/data/raw/meteo'), clock=self.clock)
         self.model_version = model_signature(self.model, self.ids)
         existing = self.store.setting('model_version')
         if existing and existing != self.model_version:
@@ -97,11 +100,7 @@ class Collector:
                   'daily': ','.join(VARIABLES), 'start_date': first.isoformat(), 'end_date': last.isoformat(),
                   'timezone': 'Europe/Paris', 'wind_speed_unit': 'kmh', 'temperature_unit': 'celsius',
                   'precipitation_unit': 'mm'}
-        # Older startup gaps use the matching operational-model archive, not ERA5.
-        url = self.api
-        if first < self.clock().astimezone(PARIS).date()-timedelta(days=90):
-            url = 'https://historical-forecast-api.open-meteo.com/v1/forecast'
-        response = self.session.get(url, params=params, timeout=(15, 120))
+        response = self.session.get(self.api, params=params, timeout=(15, 120))
         response.raise_for_status()
         payload = response.json()
         items = payload if isinstance(payload, list) else [payload]
@@ -152,14 +151,16 @@ class Collector:
             for row in self.store.days():
                 day = unpack(row['data'])
                 rows[row['date']] = {'z': day['z'], 'fwi': day['fwi'], 'issued_at': row['issued_at'],
-                                     'consolidated': bool(row['consolidated'])}
+                                     'consolidated': bool(row['consolidated']), 'provider': row['provider'], 'imputed': row['imputed']}
             for i, day in enumerate(arrays['dates'].astype(str)):
                 if day >= now.astimezone(PARIS).date().isoformat() or day not in rows:
-                    rows[day] = {'z': arrays['z'][i], 'fwi': arrays['fwi'][i], 'issued_at': run['issued_at'], 'consolidated': False}
+                    rows[day] = {'z': arrays['z'][i], 'fwi': arrays['fwi'][i], 'issued_at': run['issued_at'], 'consolidated': False, 'provider': 'openmeteo', 'imputed': 0}
             dates = sorted(rows)
             data = {'model_version': self.model_version, 'stations': self.ids, 'dates': dates,
                     'z': [rows[d]['z'].tolist() for d in dates], 'fwi': [rows[d]['fwi'].tolist() for d in dates],
-                    'provenance': [{'issued_at': rows[d]['issued_at'], 'consolidated': rows[d]['consolidated']} for d in dates],
+                    'provenance': [{'issued_at': rows[d]['issued_at'], 'consolidated': rows[d]['consolidated'],
+                                    'provider': rows[d]['provider'], 'imputed_values': rows[d]['imputed'],
+                                    'source': 'Météo-France · observations quotidiennes' if rows[d]['provider']=='meteofrance' else 'Open-Meteo · météo modélisée · sélection automatique'} for d in dates],
                     'source': 'Open-Meteo · météo modélisée · sélection automatique', 'history_end': self.history_end}
             raw = json.dumps(data, separators=(',', ':'), allow_nan=False).encode()
             version = hashlib.sha256(raw).hexdigest()
@@ -193,15 +194,21 @@ class Collector:
             today = now.astimezone(PARIS).date()
             first = datetime.fromisoformat(anchor_date).date()+timedelta(days=1)
             cutoff = today-timedelta(days=7)
+            # Read all needed public station files once, then checkpoint small windows.
+            # No Open-Meteo request or quota reservation is used for this old gap.
+            observed = self.backfill.fetch(first, cutoff) if first <= cutoff else None
+            offset = 0
             while first <= cutoff:
                 end = min(cutoff, first+timedelta(days=13))
                 past_dates = pd.date_range(first, end).strftime('%Y-%m-%d').tolist()
-                past_weather = self.fetch(first, end)
+                past_weather = observed['weather'][offset:offset+len(past_dates)]
                 states, z, fwi = evolve(self.model, state, past_weather, past_dates)
                 if not np.isfinite(z).all() or not np.isfinite(fwi).all():
                     raise ValueError('Rattrapage FWI incomplet : dernier état conservé.')
-                self.store.save_backfill(past_dates, past_weather, states, z, fwi, now.isoformat())
+                self.store.save_backfill(past_dates, past_weather, states, z, fwi, now.isoformat(),
+                                         provider='meteofrance', imputed=observed['imputed'][offset:offset+len(past_dates)])
                 state, first = states[-1], end+timedelta(days=1)
+                offset += len(past_dates)
             last = today+timedelta(days=7)
             dates = pd.date_range(first, last).strftime('%Y-%m-%d').tolist()
             weather = self.fetch(first, last)

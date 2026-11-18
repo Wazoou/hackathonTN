@@ -3,7 +3,8 @@
 La carte conserve son historique et propose, à droite de la timeline :
 
 - **ARCHIVES** : jours passés ; stations Météo-France pour l’historique initial,
-  puis météo **modélisée Open-Meteo**, avec provenance distincte.
+  puis météo **modélisée Open-Meteo** pour les jours collectés, ou **observations
+  Météo-France** pour les jours anciens manqués, avec provenance distincte.
 - **LIVE** : risque estimé pour **toute la journée d’aujourd’hui**, révisé toutes les
   **90 minutes**. Ce n’est pas une probabilité pour l’heure qui vient.
 - **PRÉDICTION** : jours **J+1 à J+7**, avec sélection automatique des modèles
@@ -68,9 +69,31 @@ Le collecteur conserve FFMC, DMC et DC. Chaque révision repart du dernier jour
 consolidé, puis recalcule chronologiquement la fenêtre récente et les prévisions.
 Elle n’applique jamais plusieurs fois le même jour à l’état de sécheresse.
 Les jours manquants après un arrêt sont récupérés avant le calcul des prévisions.
-Pour un trou ancien, le collecteur utilise l’API Historical Forecast d’Open-Meteo,
-avec le même budget d’appels ; une longue reprise peut donc s’étaler sur plusieurs
-créneaux et ne sera pas publiée tant qu’elle est incomplète.
+**Jusqu’à J−7 inclus**, le rattrapage utilise les observations quotidiennes publiques
+**Météo-France**, sans consommer le quota Open-Meteo. Le seuil J−7 garde la fenêtre
+Open-Meteo à 14 jours : J−6 à J+7, aujourd’hui inclus.
+
+Le collecteur réutilise d’abord les fichiers présents dans
+`ifm_plus/data/raw/meteo/`, montés en lecture seule. S’ils ne couvrent pas la période,
+il consulte le catalogue officiel data.gouv.fr et télécharge uniquement les familles,
+départements et périodes nécessaires dans `data/weather/meteo-france/`. Le catalogue
+est mis en cache six heures, et les fichiers ne sont retéléchargés que lorsque leur
+version change. Il s’agit de téléchargements de fichiers publics, pas d’appels à
+l’API climatologique authentifiée. Les lots des deux années récentes représentent
+environ 52 Mo pour la métropole ; les lots historiques peuvent être plus volumineux.
+
+Les variables sont identiques à l’apprentissage : TX, UN, FFM converti en km/h et RR.
+Les valeurs manquantes peuvent être remplacées par une observation disponible parmi
+les cinq stations de référence voisines, sans propager une substitution entre stations.
+Le nombre de valeurs remplacées est enregistré et indiqué dans les détails de la carte.
+Si les observations restent incomplètes, la dernière carte est conservée : **aucun
+repli automatique sur Open-Meteo** ne dépense son quota pour ces dates anciennes.
+
+Chaque tranche de 14 jours récupérée est sauvegardée avec son état FWI. Un arrêt du
+processus ne fait pas perdre le rattrapage déjà calculé. De J−6 à aujourd’hui et pour
+les prévisions, le collecteur conserve Open-Meteo. Les anciennes archives déjà
+collectées ne sont pas remplacées rétroactivement ; la base existante est migrée
+sans perte pour enregistrer la source de chaque nouveau jour.
 
 Le risque communal est calculé avec la régression existante, puis réparti entre ses
 mailles suivant les parts de terrain existantes. Les calculs restent quotidiens ;
@@ -88,7 +111,7 @@ En régime courant : **587 × 16 = 9 392 appels équivalents par 24 heures**.
 Le collecteur impose localement des plafonds prudents de 550/minute, 9 800/24 h et
 295 000/31 jours, et compte aussi les tentatives échouées. Ces limites ne voient
 pas les appels effectués par d’autres applications utilisant la même IP.
-Un rattrapage historique consomme également ce budget. Les nouvelles données sont
+Le rattrapage ancien Météo-France ne consomme pas ce budget. Les nouvelles données sont
 récupérées toutes les 90 minutes en mode `best_match` : les métadonnées de certains
 modèles ne suffisent pas à identifier toutes ses mises à jour. Si les valeurs sont
 inchangées, aucune révision supplémentaire n’est stockée.
@@ -112,7 +135,9 @@ Tout est enregistré dans **`data/weather/`**, hors Git :
 
 Les révisions sont conservées **sept jours**. Ensuite, une seule version quotidienne
 est figée à partir de la dernière météo rétrospective Open-Meteo récupérée pour ce
-jour. Il ne s’agit ni d’une moyenne de probabilités, ni d’une observation de station.
+jour. Pour les journées anciennes manquées, la version est calculée avec les observations
+Météo-France. La source et les éventuelles substitutions sont conservées par date.
+La consolidation ne fait pas une moyenne de probabilités.
 Son état de sécheresse et ses données d’entrée sont conservés avant toute suppression
 des révisions. Les pages SQLite libérées sont réutilisées lors des écritures suivantes.
 
@@ -140,7 +165,9 @@ les probabilités comme une prévision opérationnelle validée de sécurité ci
 La finesse de la grille météo dépend des modèles ; une maille d’affichage de 2 km
 n’implique pas une mesure météo indépendante tous les 2 km.
 
-Données : [Open-Meteo](https://open-meteo.com/en/docs), modèles des services nationaux,
+Observations de rattrapage : [Météo-France, données quotidiennes](https://www.data.gouv.fr/datasets/donnees-climatologiques-de-base-quotidiennes), Licence Ouverte 2.0.
+
+Données récentes et prévisions : [Open-Meteo](https://open-meteo.com/en/docs), modèles des services nationaux,
 licence [CC BY 4.0](https://open-meteo.com/en/licence).
 L’offre publique est destinée à l’usage non commercial et soumise aux
 [quotas du fournisseur](https://open-meteo.com/en/pricing).

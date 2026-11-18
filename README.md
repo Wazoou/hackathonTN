@@ -289,7 +289,9 @@ prolonge les indices de sécheresse et applique le modèle existant sans réentr
 Les nouvelles valeurs sont chargées séparément de l’historique ; la carte et son zoom
 restent en place. Une dernière carte complète est conservée en cas de panne.
 Les révisions sont gardées sept jours, puis condensées en une version quotidienne ;
-quelques prévisions sont conservées pour évaluer J+1/J+3/J+7.
+quelques prévisions sont conservées pour évaluer J+1/J+3/J+7. Les journées anciennes
+manquées (jusqu’à J−7) sont rattrapées avec les observations Météo-France, en réutilisant
+le cache local puis les fichiers publics nécessaires, sans consommer le quota Open-Meteo.
 Voir **[LIVE_PREDICTION.md](LIVE_PREDICTION.md)** pour le démarrage, le petit fichier
 initial de sécheresse à partager, les quotas et les limites de cette nouvelle source.
 

@@ -51,6 +51,13 @@ controls.install({...history,dates,z:new Float32Array(dates.length),fwi:new Floa
 dateFormats=0;el('daily-live').onclick();
 assert.equal(loading.at(-1),true);assert.ok(dateFormats<20,`Click blocked by ${dateFormats} date conversions`);
 flush();assert.equal(updates.at(-1).key,'2026-07-03');assert.equal(loading.at(-1),false);
+// A recovered observed day must retain its own source instead of the bundle default.
+forecast.provenance[1]={provider:'meteofrance',source:'Météo-France · observations quotidiennes',issued_at:'2026-07-03T10:00:00Z',imputed_values:2,consolidated:true};
+storage.set('risk-weather-mode','archives');storage.set('risk-weather-date-archives','2026-07-02');
+merged=D.withOperational(history,forecast);assert.match(merged.provenance[1].source,/Météo-France/);
+controls.install(merged);assert.equal(updates.at(-1).kind,'observed');
+assert.match(el('daily-validation').textContent,/observations quotidiennes Météo-France/);
+assert.match(el('daily-validation').textContent,/2 valeurs météo manquantes/);
 assert.throws(()=>D.withOperational(history,{...forecast,model_version:'different-model'}),/correspondent/);
 assert.throws(()=>D.withOperational(history,{...forecast,stations:['wrong-station']}),/correspondent/);
 assert.throws(()=>D.withOperational(history,{...forecast,z:[[NaN],...[...forecast.z].slice(1)]}),/incomplète/);

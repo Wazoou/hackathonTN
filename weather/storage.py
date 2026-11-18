@@ -33,10 +33,16 @@ class Store:
               CREATE TABLE IF NOT EXISTS runs (id TEXT PRIMARY KEY, issued_at TEXT NOT NULL,
                 content_hash TEXT NOT NULL, data BLOB NOT NULL);
               CREATE TABLE IF NOT EXISTS days (date TEXT PRIMARY KEY, issued_at TEXT NOT NULL,
-                consolidated INTEGER NOT NULL DEFAULT 0, data BLOB NOT NULL);
+                consolidated INTEGER NOT NULL DEFAULT 0, data BLOB NOT NULL,
+                provider TEXT NOT NULL DEFAULT 'openmeteo', imputed INTEGER NOT NULL DEFAULT 0);
               CREATE TABLE IF NOT EXISTS evaluation (target TEXT NOT NULL, lead INTEGER NOT NULL,
                 run_id TEXT NOT NULL REFERENCES runs(id), PRIMARY KEY(target,lead));
             ''')
+            columns = {row['name'] for row in db.execute('PRAGMA table_info(days)')}
+            if 'provider' not in columns:
+                db.execute("ALTER TABLE days ADD COLUMN provider TEXT NOT NULL DEFAULT 'openmeteo'")
+            if 'imputed' not in columns:
+                db.execute('ALTER TABLE days ADD COLUMN imputed INTEGER NOT NULL DEFAULT 0')
 
     @contextmanager
     def db(self):
@@ -127,12 +133,13 @@ class Store:
                 if target in dates:
                     db.execute('INSERT OR REPLACE INTO evaluation VALUES (?,?,?)', (target, lead, run_id))
 
-    def save_backfill(self, dates, weather, states, z, fwi, issued_at):
+    def save_backfill(self, dates, weather, states, z, fwi, issued_at, provider='openmeteo', imputed=None):
         """Commit each completed historical window, so even a multi-day catch-up resumes."""
         with self.db() as db:
             for i, day in enumerate(dates):
-                db.execute('INSERT OR REPLACE INTO days VALUES (?,?,1,?)',
-                           (day, issued_at, pack(weather=weather[i], state=states[i], z=z[i], fwi=fwi[i])))
+                db.execute('INSERT OR REPLACE INTO days(date,issued_at,consolidated,data,provider,imputed) VALUES (?,?,1,?,?,?)',
+                           (day, issued_at, pack(weather=weather[i], state=states[i], z=z[i], fwi=fwi[i]),
+                            provider, int(imputed[i].sum()) if imputed is not None else 0))
 
     def compact(self, now, retention_days=7):
         """Consolidate a day before deleting revisions; retain runs used for J+1/J+3/J+7 evaluation."""

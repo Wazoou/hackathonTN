@@ -149,3 +149,10 @@ ainsi que J+1 à J+7. Les nouvelles archives restent dans `data/weather/`, hors 
 Le PC doit rester allumé pour les collectes automatiques. Consulter
 [LIVE_PREDICTION.md](LIVE_PREDICTION.md) pour préparer le fichier initial, partager
 une archive opérationnelle et éviter plusieurs collecteurs pour le groupe.
+
+
+Pour les journées anciennes manquées (J−7 et avant), le collecteur utilise désormais
+les observations publiques Météo-France. Le dossier de données brutes déjà présent
+est réutilisé en lecture seule ; il n’est pas nécessaire de l’envoyer à toute l’équipe.
+Si les fichiers sont absents, les seuls lots nécessaires sont téléchargés dans
+`data/weather/meteo-france/`. Ce rattrapage ne consomme pas le quota Open-Meteo.

@@ -52,9 +52,12 @@ services:
     build:
       context: .
       dockerfile: weather/Dockerfile
+    environment:
+      MF_DATA_DIR: /meteo-mf
     volumes:
       - ${RISK_DATA_DIR:-./risk-data}:/risk:ro,z
       - ${WEATHER_DATA_DIR:-./data/weather}:/weather:z
+      - ./ifm_plus/data/raw/meteo:/meteo-mf:ro,z
     restart: unless-stopped
 
   cam-1:

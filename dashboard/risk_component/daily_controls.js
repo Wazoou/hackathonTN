@@ -75,10 +75,10 @@ function DailyControls({onDay,onLoading=()=>{}}){
    cache.set(index,DailyLogic.computeDay(data,index));
   }
   const day=cache.get(index);
-  onDay({...day,kind:day.provenance?(mode==='live'?'live':mode==='forecast'?'forecast':'archive'):'observed',activate});activate=false;
+  onDay({...day,kind:day.provenance&&day.provenance.provider!=='meteofrance'?(mode==='live'?'live':mode==='forecast'?'forecast':'archive'):'observed',activate});activate=false;
   const trainingEnd=data.meta.bdiff?.fin?.slice(0,4);
   el('daily-validation').textContent=`Modèle entraîné ${trainingEnd?`jusqu’en ${trainingEnd}`:'sur la période historique'}. Observations BDIFF jusqu’au ${format(data.bdiff_end)}. `+
-   (day.provenance?`Open-Meteo : météo modélisée, sélection automatique. ${mode==='archives'?(day.provenance.consolidated?'Archive quotidienne consolidée. ':'Archive provisoire, susceptible d’être révisée. '):''}Risque journalier estimé ; calibration avec cette source à vérifier.`:'Historique calculé à partir des stations Météo-France.');
+   (day.provenance?.provider==='meteofrance'?`Rattrapage avec les observations quotidiennes Météo-France.${day.provenance.imputed_values?` ${day.provenance.imputed_values} valeurs météo manquantes complétées par les stations voisines.`:''}`:day.provenance?`Open-Meteo : météo modélisée, sélection automatique. ${mode==='archives'?(day.provenance.consolidated?'Archive quotidienne consolidée. ':'Archive provisoire, susceptible d’être révisée. '):''}Risque journalier estimé ; calibration avec cette source à vérifier.`:'Historique calculé à partir des stations Météo-France.');
   try{sessionStorage.setItem('risk-weather-date',day.key);sessionStorage.setItem('risk-weather-date-'+mode,day.key);}catch{}
   document.body.dataset.dailyComputeMs=(performance.now()-start).toFixed(2);
   document.body.dataset.dailyUpdates=String(Number(document.body.dataset.dailyUpdates||0)+1);

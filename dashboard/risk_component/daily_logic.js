@@ -65,7 +65,7 @@ function withOperational(history,operational){
   }else{
    z.set(operational.z[j],i*count);fwi.set(operational.fwi[j],i*count);
    let sum=0;for(let c=0;c<history.commune_station.length;c++)sum+=1/(1+Math.exp(-z[i*count+history.commune_station[c]]-history.coefficient*history.commune_terrain[c]));
-   expected[i]=sum;provenance.push({...operational.provenance[j],source:operational.source});
+   expected[i]=sum;provenance.push({source:operational.source,...operational.provenance[j]});
    revisions.push(operational.provenance[j].issued_at);
   }
  }

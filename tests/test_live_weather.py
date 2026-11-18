@@ -47,6 +47,19 @@ class Session:
         return Response([item for _ in params['latitude'].split(',')])
 
 
+class Observations:
+    def __init__(self):
+        self.calls = []
+        self.error = False
+    def fetch(self, first, last):
+        self.calls.append((first, last))
+        if self.error:
+            raise RuntimeError('Météo-France indisponible')
+        days = (last-first).days+1
+        weather = np.tile(np.array([[25,25], [30,30], [10,10], [0,0]], dtype=float), (days,1,1))
+        return {'weather': weather, 'imputed': np.zeros_like(weather, dtype=bool)}
+
+
 class LiveWeatherTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
@@ -62,7 +75,8 @@ class LiveWeatherTests(unittest.TestCase):
         np.savez(folder/'live_initial_state.npz', date=np.array('2026-07-01'), stations=self.ids, state=self.state)
         self.now = datetime(2026, 7, 3, 12, tzinfo=timezone.utc)
         self.session = Session()
-        self.collector = Collector(self.root/'risk', self.root/'weather', session=self.session, clock=lambda:self.now)
+        self.observations = Observations()
+        self.collector = Collector(self.root/'risk', self.root/'weather', session=self.session, clock=lambda:self.now, backfill=self.observations)
 
     def tearDown(self):
         self.temp.cleanup()
@@ -161,25 +175,45 @@ class LiveWeatherTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, 'Budget'):
             other.reserve(now+180, 9000)
 
-    def test_long_catchup_commits_windows_before_network_or_budget_failure(self):
+    def test_long_catchup_checkpoints_and_uses_no_openmeteo_quota_for_old_days(self):
         self.now += timedelta(days=40)
-        original_fetch = self.collector.fetch
+        original_save = self.collector.store.save_backfill
         calls = []
-        def interrupted(first, last):
-            calls.append((first, last))
+        def interrupted(*args, **kwargs):
+            calls.append(args[0])
             if len(calls) == 2:
-                raise RuntimeError('budget indisponible')
-            return original_fetch(first, last)
-        self.collector.fetch = interrupted
+                raise RuntimeError('interruption après une tranche')
+            return original_save(*args, **kwargs)
+        self.collector.store.save_backfill = interrupted
         result = self.collector.run_once()
         self.assertTrue(result['error'])
+        self.assertEqual(len(self.session.calls), 0)
         anchor, _ = self.collector.store.anchor()
-        self.assertEqual(anchor, calls[0][1].isoformat())
+        self.assertEqual(anchor, calls[0][-1])
         self.now += timedelta(seconds=INTERVAL)
-        self.collector.fetch = original_fetch
+        self.collector.store.save_backfill = original_save
         result = self.collector.run_once()
         self.assertIsNone(result['error'])
-        self.assertEqual(self.session.calls[1][1]['start_date'], (calls[0][1]+timedelta(days=1)).isoformat())
+        self.assertEqual(self.observations.calls[1][0].isoformat(), (datetime.fromisoformat(anchor)+timedelta(days=1)).date().isoformat())
+        self.assertEqual(len(self.session.calls), 1)
+        recent_first = self.now.date()-timedelta(days=6)
+        self.assertEqual(self.session.calls[0][1]['start_date'], recent_first.isoformat())
+        data = self.bundle(result)
+        by_date = dict(zip(data['dates'], data['provenance']))
+        self.assertEqual(by_date[anchor]['provider'], 'meteofrance')
+        self.assertIn('observations', by_date[anchor]['source'])
+        self.assertEqual(by_date[self.now.date().isoformat()]['provider'], 'openmeteo')
+        with self.collector.store.db() as db:
+            self.assertEqual(db.execute('SELECT sum(cost) FROM attempts').fetchone()[0], 2)
+
+    def test_observation_failure_does_not_fall_back_to_openmeteo(self):
+        self.now += timedelta(days=20)
+        self.observations.error = True
+        result = self.collector.run_once()
+        self.assertIn('Météo-France', result['error'])
+        self.assertEqual(self.session.calls, [])
+        with self.collector.store.db() as db:
+            self.assertEqual(db.execute('SELECT count(*) FROM attempts').fetchone()[0], 0)
 
     def test_model_or_station_change_rejected_without_mixing_archives(self):
         path = self.root/'risk/meteo/modele.json'
