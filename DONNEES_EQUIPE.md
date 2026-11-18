@@ -37,8 +37,11 @@ L'archive inclut :
 Les deux fichiers Parquet permettent aussi de recalculer les scores avec la commande
 du README, sans les couches géographiques brutes. Pour modifier la manière dont les
 indicateurs eux-mêmes sont construits, ces couches brutes peuvent en revanche être nécessaires.
-La météo et la couche de probabilité BDIFF ne sont pas incluses. Pour ajouter la régression
-logistique nationale à partir des deux fichiers Parquet (environ 1 min, BDIFF téléchargé
+La couche de probabilité BDIFF et le risque du jour (météo) ne sont pas inclus dans cette archive.
+Pour le risque du jour, copier le dossier `risk-data/meteo/` (28 Mo) d'un membre de l'équipe, ou suivre
+la section « Risque du jour » du README (téléchargement Météo-France d'environ 1,5 Go, puis ~3 min de calcul, après la probabilité BDIFF ci-dessous).
+
+Pour ajouter la régression logistique nationale à partir des deux fichiers Parquet (environ 1 min, BDIFF téléchargé
 automatiquement depuis le portail, ~5 Mo) :
 
 ```bash

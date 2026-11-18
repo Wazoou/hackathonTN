@@ -258,6 +258,71 @@ Les réglages de la carte nationale sont appliqués directement dans le navigate
 couches, pondérations et départements ne rechargent plus les géométries. Voir le
 [rapport de performances et de tests](docs/performances_carte_risque.md).
 
+### Risque du jour : terrain × météo du jour (France entière)
+
+Quand `risk-data/meteo/` est présent, la **Carte de risque** propose une date parmi les journées météo disponibles et une
+couche **Risque du jour** : la **probabilité qu'au moins un feu de forêt démarre dans la journée** dans
+chacune des 139 842 mailles de 2 km des 96 départements. Les feux BDIFF déclarés ce jour-là sont superposés
+(ronds blancs) ; un graphique compare le nombre estimé de communes avec feu et les feux déclarés sur trois mois autour
+de la date. Le bouton **Exemples** ouvre le 12/07/2022 (Landiras, La Teste-de-Buch), le 10/08/2022 (canicule)
+et le 15/01/2022. Changer de date met à jour les valeurs du jour sans recréer la carte ni changer son zoom.
+La navigation actuelle (onglets, contours, mailles opaques, zoom animé et infobulles départementales) est conservée.
+En couche quotidienne, la proportion de mailles à risque dans l’infobulle correspond au jour choisi ;
+la moyenne annuelle BDIFF reste une référence historique. Les mailles sans météo sont grises et exclues des statistiques.
+
+- **Météo** : données climatologiques quotidiennes Météo-France (data.gouv.fr, sans compte) de
+  587 stations ayant TX, humidité minimale, vent moyen et pluie au moins 80 % des jours depuis 2005 ;
+  un trou est comblé par la station la plus proche. Mise à jour quotidienne (dernier jour : J−2 environ).
+- **Indice forêt-météo (FWI)** : système canadien de Van Wagner (1987), base de l'IFM de Météo-France,
+  calculé dans `ml/fwi.py` (vérifié sur le jour de référence de Van Wagner & Pickett). Avec des données
+  quotidiennes, on utilise TX et l'humidité minimale au lieu des valeurs de midi : le danger est un peu surestimé.
+- **Modèle** : régression logistique commune-jour sur les feux BDIFF datés (46 030 communes-jours avec feu,
+  33 373 communes), avec le risque de terrain de la commune (déduit de `p_feu`) et les sous-indices FFMC,
+  DMC, DC et ISI de la station la plus proche du centre de la commune. Les jours sans feu sont tirés à 0,5 %
+  (poids 200). La probabilité de la commune est répartie entre ses mailles au prorata de leur risque de terrain.
+
+| Test 2019-2024 (apprentissage 2006-2018) | AUC | PR-AUC |
+|---|---:|---:|
+| Terrain seul | 0,828 | 0,0018 |
+| Terrain + saison (jour de l'année) | 0,848 | 0,0025 |
+| Terrain + FWI | 0,884 | 0,0039 |
+| **Terrain + sous-indices FWI (publié)** | **0,908** | **0,0055** |
+
+La météo du jour apporte nettement plus que le calendrier. Coefficients publiés : terrain +1,03,
+FFMC/100 −2,13, log(1+DMC) +1,03, log(1+DC) −0,69, log(1+ISI) +0,82, constante −5,37. Le modèle
+« terrain + saison + sous-indices » obtient 0,861 en test, moins que sans la saison ; il n'est pas publié
+(cause non établie, peut-être une saisonnalité différente entre régions et entre périodes).
+
+Calibration (communes-jours avec feu attendues / observées) : 1,19 sur 2006-2018, **1,09 sur 2019-2024** ;
+corrélation quotidienne attendus/déclarés 0,76 en test. **Les journées extrêmes sont sous-estimées** :
+19 départs attendus pour 36 déclarés le 12/07/2022, 31,6 pour 85 le 10/08/2022, lorsque des feux touchent
+des régions peu exposées d'ordinaire (Bretagne, Nord, Jura). Le 15/01/2022 : 4,6 attendus, 4 déclarés.
+
+Le modèle final est réentraîné sur **toute la période disponible**, conformément à l’usage prévu.
+Rejouer cette période est une démonstration historique. Les métriques ci-dessus sont celles
+rapportées par la branche météo ; le terrain a lui aussi été appris sur 2006–2024 et
+ces chiffres ne constituent donc pas une validation temporelle entièrement indépendante.
+
+Limites : données observées (pas une prévision), une station pour plusieurs communes, feux localisés
+à la commune, vent moyen journalier au lieu du vent de l'après-midi.
+
+```bash
+ifm_plus/.venv/bin/python ml/download_meteo.py --out ifm_plus/data/raw/meteo \
+  --departements $(printf "%02d " $(seq 1 95))          # ~1,5 Go, quelques minutes
+ifm_plus/.venv/bin/python ml/build_daily_risk.py --risk-data risk-data \
+  --features ifm_plus/data/processed/dfci_2km_features_france.parquet \
+  --meteo ifm_plus/data/raw/meteo --bdiff ifm_plus/data/raw/manual/bdiff   # ~3 min, 2,4 Go de mémoire
+```
+
+Prérequis : `risk-data/` avec la couche `p_feu` (`ml/build_static_risk.py --bdiff`). Sortie : `risk-data/meteo/`
+(28 Mo : `meteo.npz` avec la partie météo du modèle et le FWI par station et par jour, rattachement des
+communes et des mailles, feux datés, modèle et AUC). Météo-France code la Corse `20` : les communes sont
+rattachées à la station la plus proche, quel que soit le département. Le dossier météo reste hors Git et peut être partagé sans les données brutes.
+Après copie dans `risk-data/meteo/`, relancer le dashboard suffit (montage déjà présent).
+Sans ce dossier, la carte annuelle et l’historique restent disponibles. Tests :
+`python -m unittest discover -s tests -p "test_*daily*.py"` ;
+`python -m unittest discover -s tests -p test_fwi.py` ; `node tests/test_risk_focus.cjs`.
+
 ### Reproduire la carte
 
 Pour afficher les mêmes données que l'équipe sans télécharger les sources brutes,
@@ -333,8 +398,8 @@ Tests : `python -m unittest tests/test_static_risk.py` ; interface :
 |---|---|
 | `api/` | Reçoit les images et les détections, crée une alerte après `MIN_CONSECUTIVE` images avec une confiance ≥ `CONF_THRESHOLD`. Doc interactive : http://localhost:8000/docs |
 | `camera/` | Agent caméra (équivalent simplifié de `pyro-engine`). Sources : `synthetic`, un dossier d'images, une vidéo `.mp4`, un flux `rtsp://`, ou l'URL d'une image de webcam publique |
-| `dashboard/` | Interface des pompiers : http://localhost:8501 (carte des archives, carte de risque, surveillance simulée) |
-| `ml/` | Téléchargement du dataset `pyro-sdis`, évaluation et fine-tuning YOLO, import BDIFF et calcul de la carte de risque |
+| `dashboard/` | Interface des pompiers : http://localhost:8501 (carte des archives, carte de risque et risque du jour, surveillance simulée) |
+| `ml/` | Téléchargement du dataset `pyro-sdis`, évaluation et fine-tuning YOLO, import BDIFF et Météo-France, calcul FWI, carte de risque et risque du jour |
 
 ## Démarrage
 

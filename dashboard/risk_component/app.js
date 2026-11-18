@@ -6,9 +6,12 @@ let dataset=null,map=null,version=null,pending=null,frame=null,view=null,selecte
 const CELL_DETAILS_ZOOM=7;
 let cameraFrame=null;
 let rows=new Map(),bounds=new Map(),deptNumbers=new Map(),statsCache=new Map(),colorsCache=new Map();
-let filterExtension=null,currentColors=null,renderedLayers=[],loadCount=0;
+let filterExtension=null,currentColors=null,renderedLayers=[],loadCount=0,daily=null;
 const indicatorKeys=['s_combustible','s_humain','foret_frac','resineux_frac','wui_frac','route_ponderee_km'];
 let nationalIndicators={},indicatorCache=new Map();
+const UNITS={p_feu:[2,' %/an'],p_jour:[2,' / 10 000']};
+const unit=layer=>UNITS[layer]||[1,' / 100'];
+const layerKey=(layer=state.layer)=>layer==='score'?R.scoreKey(state):layer==='p_jour'?`p_jour|${daily?.key}`:layer;
 const fmt=(n,d=0)=>Number(n).toLocaleString('fr-FR',{minimumFractionDigits:d,maximumFractionDigits:d});
 const score=f=>dataset.scores[R.scoreKey(state)][f._index]/10;
 const value=f=>R.value(f,state,dataset.scores);
@@ -74,12 +77,12 @@ function departmentTooltipHTML(dept){
  const observed=history?.departments[dept];
  const annual=years.length?`${fmt(observed?.annual_mean??0,1)} départs de feu par an en moyenne`:'Historique BDIFF indisponible';
  const period=history?.complete?'2006–2024':years.join(', ');
- const riskLayer=dataset.layers.p_feu?'p_feu':'score',s=stats(dept,riskLayer);
+ const riskLayer=state.layer==='p_jour'?'p_jour':dataset.layers.p_feu?'p_feu':'score',s=stats(dept,riskLayer);
  return `<strong>${R.escape(dataset.department_names[dept]||dept)} (${R.escape(dept)})</strong><br>`+
   `<b>${annual}</b><br>`+
   (years.length?`<span style="font-size:11px">Historique BDIFF ${R.escape(period)}${history.complete?'':' · couverture partielle'}</span><br>`:'')+
-  `<b>${fmt(s.high*100,1)} % des mailles</b> à risque élevé ou très élevé<br>`+
-  `<span style="font-size:11px">${riskLayer==='p_feu'?'Modèle BDIFF · sans météo du jour':'Score expert · sans météo du jour'}</span>`;
+  (s.count===0?'Météo indisponible pour ce département<br>':`<b>${fmt(s.high*100,1)} % des mailles${s.count<rows.get(dept).length?' renseignées':''}</b> à risque élevé ou très élevé<br>`)+
+  `<span style="font-size:11px">${riskLayer==='p_jour'?`Modèle météo du ${R.escape(daily.label)}`:riskLayer==='p_feu'?'Modèle BDIFF · sans météo du jour':'Score expert · sans météo du jour'}</span>`;
 }
 function hoverMap({object}){
  const dept=hoveredDepartment(object);
@@ -88,19 +91,26 @@ function hoverMap({object}){
 function featureHTML(f){
  const p=f.properties, v=value(f), e=R.escape;
  return `<b>${e(p.commune)} (${e(p.dept)}) · ${e(p.id)}</b><br>`+
- `<b>${e(dataset.layers[state.layer])} : ${fmt(v,state.layer==='p_feu'?2:1)}${state.layer==='p_feu'?' %/an':' / 100'}</b> (${R.riskClass(v,state.layer)})<br>`+
+ (v==null||v<0?`<b>${e(dataset.layers[state.layer])} : non disponible</b><br>`:
+  `<b>${e(dataset.layers[state.layer])} : ${fmt(v,unit(state.layer)[0])}${unit(state.layer)[1]}</b> (${R.riskClass(v,state.layer)})<br>`)+
  `Score : ${fmt(score(f),1)} · combustible ${fmt(p.s_combustible,1)} · humain ${fmt(p.s_humain,1)}<br>`+
  `Forêt ${percent(p.foret_frac)} · résineux ${percent(p.resineux_frac)} · WUI ${percent(p.wui_frac)}<br>`+
  `Agriculture ${percent(p.agri_frac)} · routes pondérées ${p.route_ponderee_km==null?'Non disponible':fmt(p.route_ponderee_km,3)+' km'}<br>`+
  `Pente moyenne ${p.pente_moy_deg==null?'Non disponible':fmt(p.pente_moy_deg,3)+'°'}`+
- (p.p_feu==null?'':`<br>Estimation BDIFF : ${fmt(p.p_feu,2)} %/an`);
+ (p.p_feu==null?'':`<br>Estimation BDIFF : ${fmt(p.p_feu,2)} %/an`)+
+ (p.p_jour==null||p.p_jour<0||state.layer==='p_jour'?'':`<br>Risque du ${e(daily.label)} : ${fmt(p.p_jour,2)} / 10 000`)+
+ (p.fwi==null||state.layer!=='p_jour'?'':`<br>FWI de la station : ${fmt(p.fwi,1)}`);
 }
 function colors(){
- const key=state.layer==='score'?R.scoreKey(state):state.layer;
+ const key=layerKey();
  if(!colorsCache.has(key)){
+  if(colorsCache.size>=40)colorsCache.delete(colorsCache.keys().next().value);
   const array=new Uint8ClampedArray(dataset.features.length*4);
   for(const f of dataset.features){
-   const s=R.scale(value(f),state.layer),c=state.layer==='p_feu'?dataset.probability_colors[f._index]:dataset.colors[Math.min(1000,Math.max(0,Math.round(s*10)))];
+   const v=value(f);
+   const c=state.layer==='p_feu'?dataset.probability_colors[f._index]:
+    (v==null||!Number.isFinite(v)||v<0)?[200,200,200,255]:
+    dataset.colors[Math.min(1000,Math.max(0,Math.round(R.scale(v,state.layer)*10)))];
    array.set(c,f._index*4);
   }
   colorsCache.set(key,array);
@@ -111,6 +121,11 @@ function colors(){
 // Stable accessors and data references: changing filters does not rebuild geometry or colors.
 const getColor=f=>currentColors.subarray(f._index*4,f._index*4+4);
 const getFilter=f=>deptNumbers.get(f.properties.dept);
+function firesLayer(){
+ const data=(daily&&daily.fires||[]).filter(f=>state.dept==='all'||f[2]===state.dept);
+ return new deck.ScatterplotLayer({id:'daily-fires',data,getPosition:f=>[f[0],f[1]],getRadius:2500,radiusMinPixels:5,
+  stroked:true,filled:true,getFillColor:[255,255,255,220],getLineColor:[17,17,17,255],lineWidthMinPixels:2,pickable:false});
+}
 function layer(colorKey){
  const n=deptNumbers.get(state.dept),range=state.dept==='all'?[-1,999]:[n,n];
  return new deck.GeoJsonLayer({id:'national-risk',data:dataset.features,pickable:true,
@@ -144,11 +159,12 @@ function updateDepartmentHighlight(){
 }
 function renderLayers(){
  renderedLayers=[departmentLayers(),layer(colors()),departmentHighlightLayer(),departmentLayers(true)];
+ if(state.layer==='p_jour'&&daily?.fires.length)renderedLayers.push(firesLayer());
  map.setProps({layers:renderedLayers});
 }
 function stats(dept=state.dept,layer=state.layer){
  const selection={...state,layer};
- const key=`${dept}|${layer}|${layer==='score'?R.scoreKey(selection):''}`;
+ const key=`${dept}|${layerKey(layer)}`;
  if(!statsCache.has(key)){
   if(statsCache.size>=64)statsCache.delete(statsCache.keys().next().value);
   statsCache.set(key,R.summary(rows.get(dept),selection,dataset.scores));
@@ -199,12 +215,12 @@ function departmentInsightsHTML(dept){
   '</ul><span class="muted">Comparaison aux moyennes des mailles nationales ; cela décrit la sensibilité du terrain, pas le risque du jour.</span></div>';
 }
 function departmentHTML(dept){
- const s=stats(dept),e=R.escape,unit=state.layer==='p_feu'?' %/an':' / 100';
+ const s=stats(dept),e=R.escape,[decimals,suffix]=unit(state.layer);
  return `<strong>${e(dataset.department_names[dept]||dept)} (${e(dept)})</strong><br>`+
   `${fmt(s.count)} mailles de 2 km<br>`+
-  `${e(dataset.layers[state.layer])} : médiane <b>${fmt(s.median,state.layer==='p_feu'?2:1)}${unit}</b><br>`+
-  `Mailles en classe élevée ou plus : <b>${fmt(s.high*100,1)} %</b><br>`+
-  '<span class="muted">Synthèse des mailles du département, sans météo du jour.</span>';
+  `${e(dataset.layers[state.layer])} : médiane <b>${s.median===null?'Non disponible':fmt(s.median,decimals)+suffix}</b><br>`+
+  `Mailles en classe élevée ou plus : <b>${s.high===null?'Non disponible':fmt(s.high*100,1)+' %'}</b><br>`+
+  `<span class="muted">${state.layer==='p_jour'?`Météo observée du ${R.escape(daily.label)} · ${fmt(s.count)} mailles renseignées sur ${fmt(rows.get(dept).length)}.`:'Synthèse des mailles du département, sans météo du jour.'}</span>`;
 }
 function updateDepartmentDetails(){
  $('department-details').hidden=!selectedDept;
@@ -232,7 +248,7 @@ function update(kind='layer'){
   const span=document.createElement('span'),swatch=document.createElement('i');swatch.style.background=`rgb(${rgb})`;
   span.append(swatch,document.createTextNode(`${name} (${high?low+'–'+high:'≥ '+low})`));$('legend').append(span);
  }
- $('explanation').textContent=state.layer==='p_feu'?''
+ $('explanation').textContent=state.layer==='p_jour'?`Risque du ${daily.label}, pour 10 000 : terrain et météo observée. Ronds blancs : feux BDIFF déclarés. Les probabilités communales sont réparties entre les mailles ; ce n’est pas une prévision.`:state.layer==='p_feu'?''
   :'Indice de sensibilité du terrain, relatif aux départements calculés ensemble. Végétation, relief et pression humaine ; sans météo, ce score n’est pas une probabilité.';
  updateDepartmentDetails();
  if(kind==='department'){
@@ -244,10 +260,43 @@ function update(kind='layer'){
  requestAnimationFrame(()=>requestAnimationFrame(()=>{document.body.dataset.frameMs=(performance.now()-start).toFixed(2);}));
  try{sessionStorage.setItem('risk-controls',JSON.stringify(state));}catch{}
 }
+function renderLayerControls(){
+ $('layers').innerHTML='<legend>Couche affichée</legend>';
+ for(const [v,label] of Object.entries(dataset.layers)){
+  const l=document.createElement('label');l.className='choice';const input=document.createElement('input');input.type='radio';input.name='layer';input.value=v;input.checked=v===state.layer;
+  input.onchange=()=>{state.layer=v;update('layer');};l.append(input,document.createTextNode(label));$('layers').append(l);
+ }
+}
+// Risque du jour : seules les valeurs changent d'une date à l'autre (Float32, base64), jamais les géométries.
+function applyDaily(d){
+ if(!dataset)return;
+ const had=!!dataset.layers.p_jour;
+ if(!d){
+  daily=null;delete dataset.layers.p_jour;dataset.features.forEach(f=>{delete f.properties.p_jour;delete f.properties.fwi;});
+  delete document.body.dataset.dailyKey;
+  for(const key of [...colorsCache.keys()])if(key.startsWith('p_jour|'))colorsCache.delete(key);
+  for(const key of [...statsCache.keys()])if(key.includes('p_jour|'))statsCache.delete(key);
+  if(state.layer==='p_jour')state.layer=dataset.layers.p_feu?'p_feu':'score';
+  if(had){renderLayerControls();update('layer');}
+  return;
+ }
+ if(daily&&daily.key===d.key)return;
+ const decode=b64=>new Float32Array(Uint8Array.from(atob(b64),c=>c.charCodeAt(0)).buffer);
+ const values=decode(d.values),fwi=d.fwi?decode(d.fwi):null;
+ if(values.length!==dataset.features.length||(fwi&&fwi.length!==values.length))throw new Error('Données météo et maillage incompatibles');
+ dataset.features.forEach((f,i)=>{f.properties.p_jour=Number.isFinite(values[i])&&values[i]>=0?values[i]:null;f.properties.fwi=fwi&&Number.isFinite(fwi[i])&&fwi[i]>=0?fwi[i]:null;});
+ daily={key:d.key,label:d.label,fires:d.fires||[]};
+ dataset.layers={p_jour:`Risque du jour (${d.label})`,...Object.fromEntries(Object.entries(dataset.layers).filter(([k])=>k!=='p_jour'))};
+ dataset.legends.p_jour=d.legend;
+ for(const k of [...statsCache.keys()])if(k.includes('p_jour'))statsCache.delete(k);
+ if(!had&&!d.keep_layer)state.layer='p_jour';
+ document.body.dataset.dailyKey=d.key;
+ renderLayerControls();update('layer');
+}
 let scheduledKind=null;
 function schedule(kind){scheduledKind=kind;if(frame)return;frame=requestAnimationFrame(()=>{frame=null;update(scheduledKind);});}
 function initialize(data){
- dataset=data;rows=new Map([['all',data.features]]);bounds=new Map();deptNumbers=new Map();statsCache.clear();colorsCache.clear();
+ daily=null;dataset=data;rows=new Map([['all',data.features]]);bounds=new Map();deptNumbers=new Map();statsCache.clear();colorsCache.clear();
  nationalIndicators=meanIndicators(data.features);indicatorCache.clear();
  cancelCameraAnimation();
  selectedDept=null;hoveredDept=null;renderedLayers=[];
@@ -270,11 +319,7 @@ function initialize(data){
  $('department').replaceChildren();
  for(const [v,label] of [['all','Tous les départements'],...data.departments.map(d=>[d,`${data.department_names[d]||'Département'} (${d})`])]){const o=new Option(label,v);$('department').add(o);}
  $('department').value=state.dept;$('department').disabled=false;
- $('layers').innerHTML='<legend>Couche affichée</legend>';
- for(const [v,label] of Object.entries(data.layers)){
-  const l=document.createElement('label');l.className='choice';const input=document.createElement('input');input.type='radio';input.name='layer';input.value=v;input.checked=v===state.layer;
-  input.onchange=()=>{state.layer=v;update('layer');};l.append(input,document.createTextNode(label));$('layers').append(l);
- }
+ renderLayerControls();
  $('layers').disabled=false;$('weight').value=state.weight;
  document.querySelectorAll('input[name=mode]').forEach(el=>{el.checked=el.value===state.mode;el.onchange=()=>{state.mode=el.value;update('mode');};});
  filterExtension=new deck.DataFilterExtension({filterSize:1});
@@ -308,14 +353,16 @@ for(const [id,delta] of [['zoom-in',1],['zoom-out',-1]])$(id).onclick=()=>{if(ma
 $('fullscreen').onclick=async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await $('map').requestFullscreen();}catch(e){fail(e);}};
 window.addEventListener('message',async event=>{
  if(event.source!==parent||event.data.type!=='streamlit:render')return;
- const args=event.data.args;if(args.version===version||args.version===pending)return;
+ const args=event.data.args;
+ if(args.version===version){try{applyDaily(args.daily);}catch(e){fail(e);}return;}
+ if(args.version===pending)return;
  pending=args.version;$('status').hidden=false;$('error').hidden=true;
  try{
   const bytes=Uint8Array.from(atob(args.payload),c=>c.charCodeAt(0));
   const stream=new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
   const data=JSON.parse(await new Response(stream).text());
   if(pending!==args.version)return;
-  initialize(data);version=args.version;pending=null;
+  initialize(data);version=args.version;pending=null;applyDaily(args.daily);
  }catch(e){pending=null;fail(e);}
 });
 new ResizeObserver(()=>send('streamlit:setFrameHeight',{height:document.body.scrollHeight+8})).observe(document.body);
