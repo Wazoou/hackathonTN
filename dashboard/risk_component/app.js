@@ -1,10 +1,12 @@
 'use strict';
 const $=id=>document.getElementById(id), R=RiskLogic;
 const send=(type,extra={})=>parent.postMessage({isStreamlitMessage:true,type,...extra},'*');
-const state={dept:'all',layer:'score',mode:'multiplicatif',weight:12,opacity:.7};
-let dataset=null,map=null,version=null,pending=null,frame=null,selected=null,view=null,selectedDept=null;
+const state={dept:'all',layer:'score',mode:'multiplicatif',weight:12};
+let dataset=null,map=null,version=null,pending=null,frame=null,view=null,selectedDept=null,hoveredDept=null;
 let rows=new Map(),bounds=new Map(),deptNumbers=new Map(),statsCache=new Map(),colorsCache=new Map();
-let filterExtension=null,currentColors=null,loadCount=0;
+let filterExtension=null,currentColors=null,renderedLayers=[],loadCount=0;
+const indicatorKeys=['s_combustible','s_humain','foret_frac','resineux_frac','wui_frac','route_ponderee_km'];
+let nationalIndicators={},indicatorCache=new Map();
 const fmt=(n,d=0)=>Number(n).toLocaleString('fr-FR',{minimumFractionDigits:d,maximumFractionDigits:d});
 const score=f=>dataset.scores[R.scoreKey(state)][f._index]/10;
 const value=f=>R.value(f,state,dataset.scores);
@@ -49,14 +51,14 @@ function colors(){
  currentColors=colorsCache.get(key);
  return key;
 }
-// Stable accessors and data references: changing opacity/filter does not rebuild geometry or colors.
+// Stable accessors and data references: changing filters does not rebuild geometry or colors.
 const getColor=f=>currentColors.subarray(f._index*4,f._index*4+4);
 const getFilter=f=>deptNumbers.get(f.properties.dept);
 function layer(colorKey){
  const n=deptNumbers.get(state.dept),range=state.dept==='all'?[-1,999]:[n,n];
  return new deck.GeoJsonLayer({id:'national-risk',data:dataset.features,pickable:true,
   filled:true,stroked:true,getFillColor:getColor,getLineColor:[255,255,255,60],lineWidthMinPixels:.3,
-  opacity:Math.pow(state.opacity,2.2),autoHighlight:true,highlightColor:[33,110,85,200],
+  opacity:Math.pow(.7,2.2),autoHighlight:true,highlightColor:[33,110,85,200],
   extensions:[filterExtension],getFilterValue:getFilter,filterRange:range,
   updateTriggers:{getFillColor:colorKey}});
 }
@@ -64,24 +66,25 @@ function departmentLayers(outline=false){
  return new deck.GeoJsonLayer({id:outline?'department-outlines':'department-picking',
   data:dataset.department_boundaries.features,pickable:!outline,
   filled:!outline,stroked:outline,getFillColor:[0,0,0,0],
-  getLineColor:f=>f.properties.code===selectedDept?[35,90,140,255]:[45,64,79,190],
+  getLineColor:f=>f.properties.code===selectedDept?[210,35,35,255]:[45,64,79,190],
   getLineWidth:f=>f.properties.code===selectedDept?3:1,lineWidthUnits:'pixels',
   parameters:{depthTest:false},updateTriggers:{getLineColor:selectedDept,getLineWidth:selectedDept}});
 }
-function selectedDepartmentLayer(){
- if(!selectedDept)return null;
- const feature=dataset.department_boundaries.features.find(
-  item=>item.properties.code===selectedDept);
- if(!feature)return null;
- return new deck.GeoJsonLayer({id:'selected-department-fill',data:[feature],
-  pickable:false,filled:true,stroked:false,getFillColor:[125,169,201,36],
-  parameters:{depthTest:false}});
+function departmentHighlightLayer(){
+ return new deck.GeoJsonLayer({id:'department-highlights',
+  data:dataset.department_boundaries.features,pickable:false,filled:true,stroked:false,
+  getFillColor:f=>f.properties.code===selectedDept?[230,35,35,75]:
+   f.properties.code===hoveredDept?[30,110,255,70]:[0,0,0,0],
+  parameters:{depthTest:false},updateTriggers:{getFillColor:[selectedDept,hoveredDept]}});
+}
+function updateDepartmentHighlight(){
+ if(!map||!renderedLayers.length)return;
+ renderedLayers=renderedLayers.map(current=>current.id==='department-highlights'?departmentHighlightLayer():current);
+ map.setProps({layers:renderedLayers});
 }
 function renderLayers(){
- const layers=[departmentLayers(),layer(colors())],selectedLayer=selectedDepartmentLayer();
- if(selectedLayer)layers.push(selectedLayer);
- layers.push(departmentLayers(true));
- map.setProps({layers});
+ renderedLayers=[departmentLayers(),layer(colors()),departmentHighlightLayer(),departmentLayers(true)];
+ map.setProps({layers:renderedLayers});
 }
 function stats(dept=state.dept){
  const key=`${dept}|${state.layer}|${state.layer==='score'?R.scoreKey(state):''}`;
@@ -90,6 +93,49 @@ function stats(dept=state.dept){
   statsCache.set(key,R.summary(rows.get(dept),state,dataset.scores));
  }
  return statsCache.get(key);
+}
+function meanIndicators(features){
+ const totals=Object.fromEntries(indicatorKeys.map(key=>[key,{sum:0,count:0}]));
+ for(const feature of features)for(const key of indicatorKeys){
+  const value=feature.properties[key];
+  if(typeof value==='number'&&Number.isFinite(value)){
+   totals[key].sum+=value;totals[key].count++;
+  }
+ }
+ return Object.fromEntries(indicatorKeys.map(key=>[
+  key,totals[key].count?totals[key].sum/totals[key].count:null
+ ]));
+}
+function departmentInsightsHTML(dept){
+ if(!indicatorCache.has(dept))indicatorCache.set(dept,meanIndicators(rows.get(dept)||[]));
+ const indicators=indicatorCache.get(dept),factors=[],advice=[];
+ const forestHigh=indicators.foret_frac!==null&&nationalIndicators.foret_frac!==null&&indicators.foret_frac>=nationalIndicators.foret_frac+.1;
+ const coniferHigh=indicators.resineux_frac!==null&&nationalIndicators.resineux_frac!==null&&indicators.resineux_frac>=nationalIndicators.resineux_frac+.05;
+ const wuiHigh=indicators.wui_frac!==null&&nationalIndicators.wui_frac!==null&&indicators.wui_frac>=Math.max(.02,nationalIndicators.wui_frac*1.5);
+ const roadsHigh=indicators.route_ponderee_km!==null&&nationalIndicators.route_ponderee_km!==null&&indicators.route_ponderee_km>=Math.max(.25,nationalIndicators.route_ponderee_km*1.25);
+ if(forestHigh)factors.push(`Couverture forestière moyenne élevée : ${fmt(indicators.foret_frac*100,1)} % contre ${fmt(nationalIndicators.foret_frac*100,1)} % en France.`);
+ if(coniferHigh)factors.push(`Part de résineux moyenne élevée : ${fmt(indicators.resineux_frac*100,1)} % contre ${fmt(nationalIndicators.resineux_frac*100,1)} % en France.`);
+ if(wuiHigh)factors.push(`Davantage d’habitations proches de végétation (interface habitat-forêt) : ${fmt(indicators.wui_frac*100,1)} % contre ${fmt(nationalIndicators.wui_frac*100,1)} % en France.`);
+ if(roadsHigh)factors.push(`Présence de routes pondérées plus importante : ${fmt(indicators.route_ponderee_km,2)} km par maille en moyenne contre ${fmt(nationalIndicators.route_ponderee_km,2)} km en France.`);
+ if(indicators.s_combustible!==null&&nationalIndicators.s_combustible!==null&&indicators.s_combustible>=nationalIndicators.s_combustible+5&&!forestHigh&&!coniferHigh)
+  factors.push(`Le sous-score combustible moyen dépasse la moyenne nationale (${fmt(indicators.s_combustible,1)} contre ${fmt(nationalIndicators.s_combustible,1)} / 100) ; les lisières et le relief contribuent aussi au calcul.`);
+ if(indicators.s_humain!==null&&nationalIndicators.s_humain!==null&&indicators.s_humain>=nationalIndicators.s_humain+5&&!wuiHigh&&!roadsHigh)
+  factors.push(`Le sous-score de pression humaine moyen dépasse la moyenne nationale (${fmt(indicators.s_humain,1)} contre ${fmt(nationalIndicators.s_humain,1)} / 100) ; plusieurs indicateurs humains entrent dans le calcul.`);
+ if(forestHigh||coniferHigh)advice.push('Près des bois, éviter mégots, brûlages et feux en plein air ; vérifier les restrictions locales avant un barbecue.');
+ if(wuiHigh)advice.push('Près des habitations bordées de végétation, éloigner les barbecues des plantes et respecter les interdictions en période à risque.');
+ if(roadsHigh)advice.push('Aux abords des routes, ne pas jeter de mégots et éviter de stationner ou d’utiliser des outils chauds dans l’herbe sèche.');
+ if(!factors.length)factors.push('Forêt, résineux, routes et interface habitat-végétation ne dépassent pas nettement leurs références nationales.');
+ if(!advice.length)advice.push('Rester vigilant près de la végétation et respecter les consignes locales de prévention.');
+ const e=R.escape;
+ const scoreText=(value,reference)=>value===null?'non disponible':
+  fmt(value,1)+' / 100'+(reference===null?'':` (France : ${fmt(reference,1)})`);
+ return '<div class="department-insights" style="border-top:1px solid var(--line);margin-top:10px;padding-top:10px">'+
+  `<p><strong>Sous-scores moyens</strong> — combustible : ${scoreText(indicators.s_combustible,nationalIndicators.s_combustible)} ; pression humaine : ${scoreText(indicators.s_humain,nationalIndicators.s_humain)}.</p>`+
+  '<strong>Facteurs qui peuvent augmenter la sensibilité</strong><ul style="margin:5px 0 10px;padding-left:18px">'+
+  factors.map(item=>`<li>${e(item)}</li>`).join('')+
+  '</ul><strong>Conseils de vigilance</strong><ul style="margin:5px 0 10px;padding-left:18px">'+
+  advice.map(item=>`<li>${e(item)}</li>`).join('')+
+  '</ul><span class="muted">Comparaison aux moyennes des mailles nationales ; cela décrit la sensibilité du terrain, pas le risque du jour.</span></div>';
 }
 function departmentHTML(dept){
  const s=stats(dept),e=R.escape,unit=state.layer==='p_feu'?' %/an':' / 100';
@@ -101,7 +147,7 @@ function departmentHTML(dept){
 }
 function updateDepartmentDetails(){
  $('department-details').hidden=!selectedDept;
- if(selectedDept)$('department-summary').innerHTML=departmentHTML(selectedDept);
+ if(selectedDept)$('department-summary').innerHTML=departmentHTML(selectedDept)+departmentInsightsHTML(selectedDept);
 }
 function selectDepartment(dept){
  if(!rows.has(dept))return;
@@ -109,27 +155,22 @@ function selectDepartment(dept){
 }
 function controls(){
  $('modes').disabled=state.layer!=='score';$('weight').disabled=state.layer!=='score'||state.mode!=='additif';
- $('weight-value').textContent=`${state.weight*5} %`;$('opacity-value').textContent=`${Math.round(state.opacity*100)} %`;
+ $('weight-value').textContent=`${state.weight*5} %`;
 }
 function update(kind='layer'){
  if(!dataset||!map)return;
  const start=performance.now();
  if(kind==='department')selectedDept=state.dept==='all'?null:state.dept;
  renderLayers();controls();
- // Opacity only updates a GPU uniform: no sort, statistics or Python rerun.
- if(kind!=='opacity'){
-  $('legend').replaceChildren();
-  for(const [name,low,high,rgb] of dataset.legends[state.layer]){
-   const span=document.createElement('span'),swatch=document.createElement('i');swatch.style.background=`rgb(${rgb})`;
-   span.append(swatch,document.createTextNode(`${name} (${high?low+'–'+high:'≥ '+low})`));$('legend').append(span);
-  }
-  $('explanation').textContent=state.layer==='p_feu'?''
-   :'Indice de sensibilité du terrain, relatif aux départements calculés ensemble. Végétation, relief et pression humaine ; sans météo, ce score n’est pas une probabilité.';
-  if(selected)$('selected').innerHTML=featureHTML(selected);
-  updateDepartmentDetails();
+ $('legend').replaceChildren();
+ for(const [name,low,high,rgb] of dataset.legends[state.layer]){
+  const span=document.createElement('span'),swatch=document.createElement('i');swatch.style.background=`rgb(${rgb})`;
+  span.append(swatch,document.createTextNode(`${name} (${high?low+'–'+high:'≥ '+low})`));$('legend').append(span);
  }
+ $('explanation').textContent=state.layer==='p_feu'?''
+  :'Indice de sensibilité du terrain, relatif aux départements calculés ensemble. Végétation, relief et pression humaine ; sans météo, ce score n’est pas une probabilité.';
+ updateDepartmentDetails();
  if(kind==='department'){
-  selected=null;$('selected').textContent='Survolez une maille pour ses indicateurs, ou cliquez pour conserver sa fiche.';
   fit();
  }
  document.body.dataset.updateMs=(performance.now()-start).toFixed(2);
@@ -142,7 +183,8 @@ let scheduledKind=null;
 function schedule(kind){scheduledKind=kind;if(frame)return;frame=requestAnimationFrame(()=>{frame=null;update(scheduledKind);});}
 function initialize(data){
  dataset=data;rows=new Map([['all',data.features]]);bounds=new Map();deptNumbers=new Map();statsCache.clear();colorsCache.clear();
- selected=null;selectedDept=null;
+ nationalIndicators=meanIndicators(data.features);indicatorCache.clear();
+ selectedDept=null;hoveredDept=null;renderedLayers=[];
  data.departments.forEach((d,i)=>{deptNumbers.set(d,i);rows.set(d,[]);});
  data.features.forEach((f,i)=>{
   f._index=i;rows.get(f.properties.dept).push(f);
@@ -158,7 +200,7 @@ function initialize(data){
  if(!rows.has(state.dept))state.dept='all';if(!data.layers[state.layer])state.layer='score';
  selectedDept=state.dept==='all'?null:state.dept;
  if(!['multiplicatif','additif'].includes(state.mode))state.mode='multiplicatif';
- state.weight=Math.max(0,Math.min(20,Math.round(Number(state.weight)||0)));state.opacity=Math.max(.2,Math.min(1,Number(state.opacity)||.7));
+ state.weight=Math.max(0,Math.min(20,Math.round(Number(state.weight)||0)));
  $('department').replaceChildren();
  for(const [v,label] of [['all','Tous les départements'],...data.departments.map(d=>[d,`${data.department_names[d]||'Département'} (${d})`])]){const o=new Option(label,v);$('department').add(o);}
  $('department').value=state.dept;$('department').disabled=false;
@@ -167,7 +209,7 @@ function initialize(data){
   const l=document.createElement('label');l.className='choice';const input=document.createElement('input');input.type='radio';input.name='layer';input.value=v;input.checked=v===state.layer;
   input.onchange=()=>{state.layer=v;update('layer');};l.append(input,document.createTextNode(label));$('layers').append(l);
  }
- $('layers').disabled=false;$('opacity').disabled=false;$('opacity').value=Math.round(state.opacity*100);$('weight').value=state.weight;
+ $('layers').disabled=false;$('weight').value=state.weight;
  document.querySelectorAll('input[name=mode]').forEach(el=>{el.checked=el.value===state.mode;el.onchange=()=>{state.mode=el.value;update('mode');};});
  filterExtension=new deck.DataFilterExtension({filterSize:1});
  const initial=viewBounds(bounds.get(state.dept));
@@ -183,17 +225,19 @@ function initialize(data){
   viewState:view,controller:true,
   onViewStateChange:({viewState})=>setView(viewState),
   getTooltip:({object})=>object?{html:object.properties.code?departmentHTML(object.properties.code):featureHTML(object),style:{backgroundColor:'white',color:'#253747',fontSize:'12px',maxWidth:'360px'}}:null,
+  onHover:({object})=>{
+   const properties=object&&object.properties;
+   const dept=properties&&(properties.code||properties.dept)||null;
+   if(dept!==hoveredDept){hoveredDept=dept;updateDepartmentHighlight();}
+  },
   onClick:({object})=>{if(object){
    selectDepartment(object.properties.dept||object.properties.code);
-   selected=object.properties.dept?object:null;
-   $('selected').innerHTML=selected?featureHTML(selected):'Survolez une maille pour ses indicateurs, ou cliquez pour conserver sa fiche.';
   }},
   onError:fail});
  update();$('status').hidden=true;document.body.dataset.ready='true';document.body.dataset.loadCount=String(++loadCount);
 }
 $('department').onchange=()=>{state.dept=$('department').value;update('department');};
 $('explore-department').onclick=()=>{if(selectedDept){state.dept=selectedDept;$('department').value=state.dept;update('department');}};
-$('opacity').oninput=()=>{state.opacity=Number($('opacity').value)/100;schedule('opacity');};
 $('weight').oninput=()=>{state.weight=Number($('weight').value);schedule('weight');};
 $('fit').onclick=fit;
 for(const [id,delta] of [['zoom-in',1],['zoom-out',-1]])$(id).onclick=()=>{if(map)setView({...view,zoom:Math.max(0,Math.min(18,view.zoom+delta))});};

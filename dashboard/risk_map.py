@@ -26,7 +26,6 @@ def cached_payload(signature):
 
 
 def risk_map():
-    st.subheader('Carte de risque de départ de feu')
     signature = file_signature(RISK_DIR)
     if not signature:
         st.info('Aucune carte de risque disponible. Générez les fichiers dans risk-data avec ml/build_static_risk.py.')
