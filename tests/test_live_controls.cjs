@@ -1,10 +1,10 @@
 // The production controls and model merge, with a fixed clock and a tiny DOM adapter.
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 const D=require('../dashboard/risk_component/daily_logic.js');
-const elements=new Map(),storage=new Map(),frames=new Map(),updates=[],loading=[];let next=0;
+const elements=new Map(),storage=new Map(),frames=new Map(),updates=[],loading=[];let next=0,dateFormats=0;
 const el=id=>{if(!elements.has(id))elements.set(id,{value:'',textContent:'',open:false,setAttribute(key,value){this[key]=value;}});return elements.get(id);};
 class Clock extends Date{constructor(...args){super(...(args.length?args:['2026-07-03T12:00:00Z']));}static now(){return Date.parse('2026-07-03T12:00:00Z');}}
-const context=vm.createContext({document:{getElementById:el,body:{dataset:{}}},DailyLogic:D,Date:Clock,Intl,
+const context=vm.createContext({document:{getElementById:el,body:{dataset:{}}},DailyLogic:D,Date:Clock,Intl:{DateTimeFormat:class{constructor(...args){const formatter=new Intl.DateTimeFormat(...args);return {format(value){dateFormats++;return formatter.format(value);}};}}},
  performance:{now:()=>0},requestAnimationFrame:fn=>{frames.set(++next,fn);return next;},cancelAnimationFrame:id=>frames.delete(id),
  setTimeout:()=>1,clearTimeout(){},sessionStorage:{getItem:key=>storage.get(key),setItem:(key,value)=>storage.set(key,value)}});
 vm.runInContext(fs.readFileSync('dashboard/risk_component/daily_controls.js','utf8'),context);
@@ -44,6 +44,13 @@ assert.equal(loading.at(-1),true);
 el('daily-forecast').onclick();flush();assert.equal(updates.at(-1).kind,'forecast');assert.equal(loading.at(-1),false);
 el('daily-live').onclick();assert.equal(loading.at(-1),true);controls.clear();
 assert.equal(loading.at(-1),false);assert.equal(frames.size,0);
+// National-scale timeline: the click must not format today's date for every row.
+const dates=Array.from({length:7500},(_,i)=>new Date(Date.UTC(2006,0,1)+i*86400000).toISOString().slice(0,10));
+storage.set('risk-weather-mode','archives');
+controls.install({...history,dates,z:new Float32Array(dates.length),fwi:new Float32Array(dates.length),expected:new Float64Array(dates.length)});
+dateFormats=0;el('daily-live').onclick();
+assert.equal(loading.at(-1),true);assert.ok(dateFormats<20,`Click blocked by ${dateFormats} date conversions`);
+flush();assert.equal(updates.at(-1).key,'2026-07-03');assert.equal(loading.at(-1),false);
 assert.throws(()=>D.withOperational(history,{...forecast,model_version:'different-model'}),/correspondent/);
 assert.throws(()=>D.withOperational(history,{...forecast,stations:['wrong-station']}),/correspondent/);
 assert.throws(()=>D.withOperational(history,{...forecast,z:[[NaN],...[...forecast.z].slice(1)]}),/incomplète/);

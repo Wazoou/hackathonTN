@@ -2,15 +2,24 @@
 function DailyControls({onDay,onLoading=()=>{}}){
  const el=id=>document.getElementById(id),format=key=>key.split('-').reverse().join('/');
  const number=n=>n.toLocaleString('fr-FR',{minimumFractionDigits:1,maximumFractionDigits:1});
+ const parisDate=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit'});
  let data=null,index=0,requested=0,frame=null,chartTimer=null,cache=new Map(),mode='archives',available=[],manifest=null,activate=false,displayedToday=null;
  let switching=false,settleFrame=null,loadingVersion=0;
+ let rangeCache=null;
  function stopLoading(){
   if(settleFrame!==null)cancelAnimationFrame(settleFrame);settleFrame=null;
   loadingVersion++;
   if(switching){switching=false;onLoading(false);}
  }
- function today(){return new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());}
- function ranges(which){return data.dates.map((key,i)=>({key,i})).filter(({key})=>which==='live'?key===today():which==='forecast'?key>today():key<today()).map(row=>row.i);}
+ function today(){return parisDate.format(new Date());}
+ function ranges(which){
+  const boundary=today();
+  if(!rangeCache||rangeCache.data!==data||rangeCache.today!==boundary){
+   rangeCache={data,today:boundary,archives:[],live:[],forecast:[]};
+   data.dates.forEach((key,i)=>rangeCache[key<boundary?'archives':key===boundary?'live':'forecast'].push(i));
+  }
+  return rangeCache[which];
+ }
  function configure(previous){
   if(!data)return;
   displayedToday=today();
@@ -117,7 +126,7 @@ function DailyControls({onDay,onLoading=()=>{}}){
  el('daily-series').ontoggle=chart;
  return {
   install(model){
-   stopLoading();
+   stopLoading();rangeCache=null;
    if(frame!==null)cancelAnimationFrame(frame);frame=null;clearTimeout(chartTimer);data=model;cache.clear();
    let previous;try{mode=sessionStorage.getItem('risk-weather-mode')||mode;previous=sessionStorage.getItem('risk-weather-date-'+mode)||sessionStorage.getItem('risk-weather-date');}catch{}
    if(!['archives','live','forecast'].includes(mode))mode='archives';
@@ -126,6 +135,6 @@ function DailyControls({onDay,onLoading=()=>{}}){
    labels();render();
   },
   setStatus(value){manifest=value?{...manifest,...value}:null;status();if(data&&displayedToday!==today()){configure(data.dates[index]);choose(index);}},
-  clear(){stopLoading();if(frame!==null)cancelAnimationFrame(frame);frame=null;clearTimeout(chartTimer);data=null;cache.clear();el('time-controls').hidden=true;el('daily-series').hidden=true;}
+  clear(){stopLoading();rangeCache=null;if(frame!==null)cancelAnimationFrame(frame);frame=null;clearTimeout(chartTimer);data=null;cache.clear();el('time-controls').hidden=true;el('daily-series').hidden=true;}
  };
 }
