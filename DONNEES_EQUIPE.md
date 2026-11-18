@@ -89,13 +89,20 @@ Ouvrez **http://localhost:8501/** puis l’onglet **Webcam**. La carte doit anno
 12 223 Pyro-SDIS et 29 images de webcams, avec 10 repères au total.
 Le filtre « Toutes les sources » est sélectionné au départ.
 
-## Historique des incendies 2025
+## Historique des incendies 2006–2025
 
-Cet onglet utilise un CSV distinct des images et des scores de risque, également hors Git.
-Partagez `ifm_plus/data/raw/incendies/Incendies.csv` avec le groupe en conservant ce chemin,
+La carte de risque charge par défaut `risk-data/` à la racine. Si votre archive est
+extraite dans un autre dossier, définissez `RISK_DATA_DIR` dans `.env` avec le chemin
+du dossier contenant les GeoJSON, puis recréez le dashboard.
+
+Cet onglet utilise des CSV distincts des images et des scores de risque, également hors Git.
+Partagez le dossier `ifm_plus/data/raw/manual/bdiff/` (2006–2024) et
+`ifm_plus/data/raw/incendies/Incendies.csv` (2025), en conservant ces chemins,
 ou récupérez l’export public avec les commandes du README. Docker monte automatiquement
-le dossier `ifm_plus/data/raw/incendies/` ; relancez le dashboard si vous venez de mettre
-à jour sa configuration. Les positions affichées sont approximatives, à l’échelle communale.
+ces deux dossiers ; relancez le dashboard si vous venez de mettre
+à jour sa configuration. Le curseur d’année couvre les années présentes dans ces fichiers.
+Les positions sont approximatives, à l’échelle communale ou départementale lorsque
+la commune historique ne peut pas être localisée ; l’interface indique ces cas.
 
 ## Extraction des images
 

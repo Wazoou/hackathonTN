@@ -1,0 +1,17 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>__LEAFLET_CSS__</style>
+<style>
+*{box-sizing:border-box}body{margin:0;font:14px system-ui,sans-serif;color:#253747}.layout{display:grid;grid-template-columns:minmax(0,2.1fr) minmax(280px,1fr);gap:40px}#map{height:620px}.panel{border:1px solid #cfd8e0;border-radius:9px;padding:18px;background:#f6f8fa}h2{margin:10px 0 22px;font-size:18px;color:#1b3c59}label{display:block;margin-top:18px;margin-bottom:8px;font-weight:500}select{width:100%;padding:10px;border:0;border-radius:6px;background:#fff;color:inherit;font:inherit}input[type=range]{width:100%;accent-color:#216e55;cursor:pointer}input:disabled{cursor:default;opacity:.4}output{float:right;font-weight:600;color:#216e55}.ends{display:flex;justify-content:space-between;font-size:12px;margin-top:4px}.muted{font-size:12px;color:#64746d;line-height:1.5}#count{font-size:15px;font-weight:600;margin-top:20px}#empty,#unmapped{color:#825a12}input:focus-visible,select:focus-visible{outline:2px solid #216e55;outline-offset:3px}.month-disabled{opacity:.5}@media(max-width:750px){.layout{grid-template-columns:1fr;gap:16px}#map{height:420px}.panel{padding:14px}}
+</style><script>__LEAFLET_JS__</script></head><body>
+<main class="layout"><div id="map" aria-label="Carte des incendies en France"></div><aside class="panel" aria-label="Filtres des incendies">
+<h2>Carte des incendies passés</h2><p id="coverage" class="muted"></p>
+<label for="year">Année <output id="year-value"></output></label><input type="range" id="year" step="1"><div class="ends"><span id="first-year"></span><span id="last-year"></span></div>
+<label for="period">Incendies affichés</label><select id="period"><option value="year">Toute l’année sélectionnée</option><option value="month">Mois sélectionné</option></select>
+<label for="season">Saison</label><select id="season"><option value="all">Toutes les saisons</option><option>Hiver</option><option>Printemps</option><option>Été</option><option>Automne</option></select>
+<label for="cause">Cause</label><select id="cause"><option value="all">Toutes les causes</option><option value="accidentelle">Accidentelle</option><option value="malveillance">Malveillance</option><option value="naturelle">Foudre (naturelle)</option></select>
+<div id="month-controls"><label for="month">Mois et année <output id="month-value"></output></label><input type="range" id="month" min="1" max="12" step="1" value="12"><div class="ends"><span>Janvier</span><span>Décembre</span></div></div>
+<p id="count" aria-live="polite"></p><p id="empty" hidden>Aucun incendie ne correspond aux filtres sélectionnés.</p>
+<p class="muted">Positions approximatives à la commune ; les cercles ne représentent pas les périmètres brûlés.</p><p id="approximate" class="muted"></p><p id="unmapped"></p>
+</aside></main>
+<script>__LOGIC_JS__</script><script>const records=__RECORDS__;
+__APP_JS__</script></body></html>

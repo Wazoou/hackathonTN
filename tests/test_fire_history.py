@@ -8,7 +8,8 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "dashboard"))
 from fire_history import (
     available_months,
-    build_leaflet_map_html,
+    build_history_html,
+    history_records_payload,
     build_map_points,
     area_radius_px,
     filter_fire_records,
@@ -53,7 +54,8 @@ class FireHistoryTests(unittest.TestCase):
         self.assertEqual(total_count, 4)
         self.assertEqual(records.loc[0, "Code INSEE"], "00123")
         self.assertEqual(records.loc[2, "zone"], "Outre-mer")
-        self.assertEqual(records["latitude"].notna().sum(), 3)
+        self.assertEqual(records["latitude"].notna().sum(), 4)
+        self.assertEqual(records.loc[3, 'precision'], 'département')
         self.assertEqual(
             available_months(records),
             ["2025-01", "2025-02", "2025-03", "2025-04"],
@@ -93,6 +95,24 @@ class FireHistoryTests(unittest.TestCase):
 
         self.assertEqual(len(filtered), 1)
         self.assertEqual(filtered.iloc[0]["Date de première alerte"].month, 6)
+        self.assertEqual(len(filter_fire_records(records, year=2024)), 1)
+        self.assertEqual(len(filter_fire_records(records, year=2025)), 3)
+        self.assertTrue(filter_fire_records(records, season='Été', year=2024).empty)
+
+    def test_multiple_exports_variable_headers_and_overlap(self):
+        with tempfile.TemporaryDirectory() as directory:
+            folder = Path(directory)
+            header = 'Année;Numéro;Code INSEE;Département;Nom de la commune;Date de première alerte;Surface parcourue (m2);Nature\n'
+            row = '2022;1;33063;33;Bordeaux;2022-07-01 12:00:00;100;Naturelle\n'
+            old = folder/'old.csv'
+            old.write_text('Metadata\n'*6 + header + row)
+            recent = folder/'recent.csv'
+            recent.write_text('Metadata\n'*2 + header + row + '2025;2;33063;33;Bordeaux;2025-08-01 12:00:00;200;Naturelle\n')
+            centers = folder/'centers.csv'
+            centers.write_text('Code INSEE,latitude,longitude,precision\n33063,44.8,-0.6,commune\n')
+            records, count = load_fire_records((str(old),str(recent)),str(centers),0,0)
+            self.assertEqual(count,2)
+            self.assertEqual(sorted(records["Date de première alerte"].dt.year.tolist()),[2022,2025])
 
     def test_map_period_selects_all_records_or_the_slider_month(self):
         records = pd.DataFrame({
@@ -140,23 +160,21 @@ class FireHistoryTests(unittest.TestCase):
                     centroid_path.stat().st_mtime_ns,
                 )
 
-    def test_map_uses_the_same_openstreetmap_tiles_as_the_webcam_map(self):
-        points = pd.DataFrame([{
-            "latitude": 46.0,
-            "longitude": 5.0,
-            "incident_count": 1,
-            "locations": "Commune A",
-            "burned_area_m2": 100,
-            "radius_px": area_radius_px(100),
+    def test_persistent_map_keeps_events_and_escapes_html(self):
+        records = pd.DataFrame([{
+            "Date de première alerte": pd.Timestamp('2022-07-12'),
+            "latitude": 46.0, "longitude": 5.0, "precision": "commune",
+            "Nom de la commune": "</script><script>alert(1)</script>",
+            "Surface parcourue (m2)": 123.5, "Nature": " Naturelle ",
         }])
-
-        html = build_leaflet_map_html(points)
-
-        self.assertIn("https://tile.openstreetmap.org/{z}/{x}/{y}.png", html)
-        self.assertIn("fillColor:'#cd232d'", html)
-        self.assertIn("L.circleMarker([fire.latitude,fire.longitude]", html)
-        self.assertIn("Surface brûlée :", html)
-        self.assertNotIn("cartocdn", html)
+        rows = history_records_payload(records)
+        self.assertEqual(rows[0][:5], [2022, 7, 46.0, 5.0, 'commune'])
+        self.assertEqual(rows[0][6:], [123.5, 'naturelle'])
+        html = build_history_html(records)
+        self.assertIn('https://tile.openstreetmap.org/{z}/{x}/{y}.png', html)
+        self.assertIn('oninput', html)
+        self.assertNotIn('</script><script>alert(1)</script>', html)
+        self.assertNotIn('__RECORDS__', html)
 
 
 if __name__ == "__main__":

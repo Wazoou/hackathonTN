@@ -1,6 +1,7 @@
 """Carte des incendies recensés dans le fichier IFM+."""
 
 import json
+import io
 import math
 import os
 from pathlib import Path
@@ -22,7 +23,7 @@ MONTH_ABBREVIATIONS = (
 )
 SEASON_FILTER_ALL = "Toutes les saisons"
 CAUSE_FILTER_ALL = "Toutes les causes"
-MAP_PERIOD_ALL = "Tous les incendies"
+MAP_PERIOD_ALL = "Toute l’année sélectionnée"
 MAP_PERIOD_MONTH = "Mois sélectionné"
 SEASON_MONTHS = {
     "Hiver": {12, 1, 2},
@@ -44,23 +45,32 @@ FIRE_DATA_PATH = Path(os.getenv(
     str(PROJECT_ROOT / "ifm_plus" / "data" / "raw" / "incendies" / "Incendies.csv"),
 ))
 CENTROID_PATH = Path(__file__).resolve().parent / "assets" / "fire_commune_centroids.csv"
+DEPARTMENT_CENTROID_PATH = CENTROID_PATH.with_name('fire_department_centroids.csv')
+BDIFF_DIR = Path(os.getenv('BDIFF_DIR', str(PROJECT_ROOT / 'ifm_plus/data/raw/manual/bdiff')))
 LEAFLET_VENDOR_PATH = Path(__file__).resolve().parent / "timeline_component" / "vendor"
 
 
 @st.cache_data(show_spinner=False)
 def load_fire_records(
-    fire_path: str,
+    fire_path: str | tuple[str, ...],
     centroid_path: str,
     fire_mtime_ns: int,
     centroid_mtime_ns: int,
 ) -> tuple[pd.DataFrame, int]:
-    fires = pd.read_csv(
-        fire_path,
-        sep=";",
-        skiprows=2,
-        encoding="utf-8-sig",
-        dtype={"Code INSEE": "string"},
-    )
+    frames = []
+    for path in ((fire_path,) if isinstance(fire_path, str) else fire_path):
+        lines = Path(path).read_text(encoding='utf-8-sig').splitlines()
+        start = next((i for i, line in enumerate(lines) if 'Code INSEE' in line and DATE_COLUMN in line), None)
+        if start is None:
+            raise ValueError(f'En-tête BDIFF introuvable : {path}')
+        frames.append(pd.read_csv(io.StringIO('\n'.join(lines[start:])), sep=';',
+                                  dtype={'Code INSEE': 'string', 'Département': 'string', 'Numéro': 'string'}))
+    fires = pd.concat(frames, ignore_index=True)
+    if {'Année', 'Numéro'} <= set(fires.columns):
+        # The same export may be shared twice, or overlap a later export.
+        identified = fires[['Année', 'Numéro']].notna().all(axis=1)
+        fires = pd.concat([fires[identified].drop_duplicates(['Année', 'Numéro'], keep='last'),
+                           fires[~identified]], ignore_index=True)
     required_fire_columns = {
         "Code INSEE",
         "Nom de la commune",
@@ -96,7 +106,14 @@ def load_fire_records(
         centroids[column] = pd.to_numeric(centroids[column], errors="coerce")
 
     records = fires.merge(centroids, on="Code INSEE", how="left", validate="many_to_one")
-    is_overseas = records["Code INSEE"].fillna("").str.startswith(("97", "98"))
+    dept = records.get('Département', records['Code INSEE'].str[:2]).astype('string').str.strip().str.zfill(2)
+    if DEPARTMENT_CENTROID_PATH.is_file():
+        centers = pd.read_csv(DEPARTMENT_CENTROID_PATH, dtype={'departement': 'string'}).set_index('departement')
+        missing = records[['latitude', 'longitude']].isna().any(axis=1)
+        for col in ('latitude', 'longitude'):
+            records.loc[missing, col] = dept[missing].map(centers[col])
+        records.loc[missing & records['latitude'].notna(), 'precision'] = 'département'
+    is_overseas = dept.fillna('').str.startswith(('97', '98')) | records["Code INSEE"].fillna("").str.startswith(("97", "98"))
     records["zone"] = is_overseas.map({
         True: "Outre-mer",
         False: "France métropolitaine",
@@ -142,8 +159,11 @@ def filter_fire_records(
     records: pd.DataFrame,
     season: str = SEASON_FILTER_ALL,
     cause: str = CAUSE_FILTER_ALL,
+    year: int | None = None,
 ) -> pd.DataFrame:
     filtered = records
+    if year is not None:
+        filtered = filtered[filtered[DATE_COLUMN].dt.year == year]
     if season != SEASON_FILTER_ALL:
         if season not in SEASON_MONTHS:
             raise ValueError(f"Saison inconnue : {season}")
@@ -179,53 +199,40 @@ def build_map_points(records: pd.DataFrame) -> pd.DataFrame:
     return points
 
 
-def build_leaflet_map_html(points: pd.DataFrame) -> str:
-    leaflet_css = (LEAFLET_VENDOR_PATH / "leaflet.css").read_text(encoding="utf-8")
-    leaflet_js = (LEAFLET_VENDOR_PATH / "leaflet.js").read_text(encoding="utf-8")
-    fire_points = [
-        {
-            "latitude": float(row.latitude),
-            "longitude": float(row.longitude),
-            "incident_count": int(row.incident_count),
-            "locations": str(row.locations),
-            "burned_area_m2": float(row.burned_area_m2),
-            "radius_px": float(row.radius_px),
-        }
-        for row in points.itertuples()
-    ]
-    points_json = json.dumps(fire_points, ensure_ascii=False)
-    points_json = (
-        points_json.replace("&", "\\u0026")
-        .replace("<", "\\u003c")
-        .replace(">", "\\u003e")
-        .replace("\u2028", "\\u2028")
-        .replace("\u2029", "\\u2029")
-    )
-    return (
-        "<!doctype html><html><head><meta charset='utf-8'>"
-        f"<style>{leaflet_css}</style>"
-        "<style>html,body,#map{height:100%;margin:0}body{font:13px system-ui,sans-serif}</style>"
-        f"<script>{leaflet_js}</script>"
-        "</head><body><div id='map' aria-label='Carte des incendies en France'></div>"
-        f"<script>const firePoints={points_json};"
-        "const map=L.map('map',{scrollWheelZoom:true}).setView([46.5,2.3],6);"
-        "L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',"
-        "{attribution:'&copy; <a href=\"https://www.openstreetmap.org/copyright\">OpenStreetMap</a>',maxZoom:19}).addTo(map);"
-        "for(const fire of firePoints){"
-        "const marker=L.circleMarker([fire.latitude,fire.longitude],{radius:fire.radius_px,color:'#7d0a14',"
-        "weight:1,fillColor:'#cd232d',fillOpacity:0.75}).addTo(map);"
-        "const tooltip=document.createElement('div');"
-        "const place=document.createElement('strong');place.textContent=fire.locations;"
-        "const count=document.createElement('div');count.textContent='Incendies : '+fire.incident_count;"
-        "const surface=document.createElement('div');surface.textContent='Surface brûlée : '+fire.burned_area_m2.toLocaleString('fr-FR')+' m²';"
-        "tooltip.append(place,count,surface);marker.bindTooltip(tooltip);}"
-        "requestAnimationFrame(()=>map.invalidateSize());</script></body></html>"
-    )
+def history_records_payload(records: pd.DataFrame) -> list:
+    """Keep every event; filtering and aggregation happen locally in the browser."""
+    data = []
+    for _, row in records.iterrows():
+        date = row[DATE_COLUMN]
+        data.append([int(date.year), int(date.month),
+                     None if pd.isna(row.latitude) else float(row.latitude),
+                     None if pd.isna(row.longitude) else float(row.longitude),
+                     None if pd.isna(row.precision) else str(row.precision),
+                     None if pd.isna(row['Nom de la commune']) else str(row['Nom de la commune']),
+                     float(row[SURFACE_COLUMN]),
+                     '' if pd.isna(row[CAUSE_COLUMN]) else str(row[CAUSE_COLUMN]).strip().casefold()])
+    return data
+
+
+def build_history_html(records: pd.DataFrame) -> str:
+    folder = Path(__file__).parent / 'history_component'
+    payload = json.dumps(history_records_payload(records), ensure_ascii=False, allow_nan=False)
+    payload = payload.replace('&', '\\u0026').replace('<', '\\u003c').replace('>', '\\u003e').replace('\u2028', '\\u2028').replace('\u2029', '\\u2029')
+    replacements = {
+        '__LEAFLET_CSS__': (LEAFLET_VENDOR_PATH / 'leaflet.css').read_text(),
+        '__LEAFLET_JS__': (LEAFLET_VENDOR_PATH / 'leaflet.js').read_text(),
+        '__LOGIC_JS__': (folder / 'logic.js').read_text(),
+        '__APP_JS__': (folder / 'app.js').read_text(),
+        '__RECORDS__': payload,
+    }
+    import re
+    return re.sub('|'.join(replacements), lambda match: replacements[match.group()], (folder / 'index.html').read_text())
 
 
 def render_fire_history() -> None:
-    if not FIRE_DATA_PATH.is_file():
-        st.error(f"Fichier d’incendies introuvable : {FIRE_DATA_PATH}")
+    paths = sorted(set(([FIRE_DATA_PATH] if FIRE_DATA_PATH.is_file() else []) + list(BDIFF_DIR.glob('*.csv'))))
+    if not paths:
+        st.error('Aucun export BDIFF disponible. Ajoutez les CSV dans les dossiers de données incendies.')
         return
     if not CENTROID_PATH.is_file():
         st.error(f"Fichier de coordonnées introuvable : {CENTROID_PATH}")
@@ -233,9 +240,9 @@ def render_fire_history() -> None:
 
     try:
         records, _ = load_fire_records(
-            str(FIRE_DATA_PATH),
+            tuple(str(p) for p in paths),
             str(CENTROID_PATH),
-            FIRE_DATA_PATH.stat().st_mtime_ns,
+            tuple((p.stat().st_mtime_ns, p.stat().st_size) for p in paths),
             CENTROID_PATH.stat().st_mtime_ns,
         )
     except (OSError, UnicodeDecodeError, pd.errors.ParserError, ValueError) as error:
@@ -247,90 +254,4 @@ def render_fire_history() -> None:
         st.info("Aucun incendie recensé en France métropolitaine.")
         return
 
-    st.markdown(
-        """<style>
-        .st-key-fire_history_filters {
-            box-sizing: border-box;
-            min-height: 620px;
-        }
-        .st-key-fire_history_filters,
-        .st-key-fire_history_filters * {
-            font-family: system-ui, sans-serif !important;
-        }
-        .st-key-fire_history_filters [data-testid="stSelectbox"],
-        .st-key-fire_history_filters [data-testid="stSlider"] {
-            margin-right: 0.75rem;
-        }
-        </style>""",
-        unsafe_allow_html=True,
-    )
-    map_column, filters_column = st.columns([2.1, 1], gap="large")
-    with filters_column:
-        with st.container(border=True, key="fire_history_filters"):
-            st.markdown(
-                '<h2 style="margin:0 0 12px;color:#1b3c59;font-size:18px;'
-                'font-family:system-ui,sans-serif">Carte des incendies passés</h2>',
-                unsafe_allow_html=True,
-            )
-            selected_map_period = st.selectbox(
-                "Incendies affichés",
-                [MAP_PERIOD_ALL, MAP_PERIOD_MONTH],
-                key="fire_history_map_period",
-            )
-            selected_season = st.selectbox(
-                "Saison",
-                [SEASON_FILTER_ALL, *SEASON_MONTHS],
-                key="fire_history_season",
-            )
-            selected_cause = st.selectbox(
-                "Cause",
-                [CAUSE_FILTER_ALL, *CAUSE_VALUES],
-                key="fire_history_cause",
-            )
-
-            filtered_records = filter_fire_records(
-                metropolitan_records,
-                selected_season,
-                selected_cause,
-            )
-            if filtered_records.empty:
-                st.info("Aucun incendie ne correspond aux filtres sélectionnés.")
-                return
-
-            months = available_months(filtered_records)
-            if st.session_state.get("fire_history_month") not in months:
-                st.session_state["fire_history_month"] = months[-1]
-            selected_month = st.select_slider(
-                "Mois et année",
-                options=months,
-                format_func=format_slider_month,
-                key="fire_history_month",
-                label_visibility="collapsed",
-            )
-            month_records = fire_records_for_map_period(
-                filtered_records,
-                selected_map_period,
-                selected_month,
-            )
-            if month_records.empty:
-                st.info(f"Aucun incendie recensé en {format_month(selected_month)}.")
-                return
-            located = month_records.dropna(subset=["latitude", "longitude"])
-
-            unmapped_count = len(month_records) - len(located)
-            if unmapped_count:
-                st.warning(
-                    f"{unmapped_count:,} incendie(s) sans coordonnées ne sont pas représentés sur la carte."
-                )
-            if located.empty:
-                st.info(f"Aucun incendie recensé en {format_month(selected_month)}.")
-                return
-
-    points = build_map_points(located)
-    try:
-        map_html = build_leaflet_map_html(points)
-    except OSError as error:
-        st.error(f"Impossible de charger les fichiers cartographiques : {error}")
-        return
-    with map_column:
-        components.html(map_html, height=620, scrolling=False)
+    components.html(build_history_html(metropolitan_records), height=790, scrolling=True)

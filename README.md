@@ -35,8 +35,15 @@ Les détails de la maille cliquée restent accessibles. Les contours IGN sont fo
 avec le code et simplifiés à 50 m uniquement pour l’affichage ; les géométries du
 maillage et les calculs ne sont pas modifiés. Leur export peut être régénéré depuis
 le cache IGN avec `ifm_plus/.venv/bin/python ml/build_department_boundaries.py`.
-L’historique utilise l’export BDIFF 2025
-`ifm_plus/data/raw/incendies/Incendies.csv` ; les cercles rouges indiquent les communes
+L’historique réunit les exports BDIFF 2006–2024 du dossier
+`ifm_plus/data/raw/manual/bdiff/` et l’export 2025
+`ifm_plus/data/raw/incendies/Incendies.csv`, sans compter deux fois les mêmes incendies.
+Le curseur **Année** sélectionne l’année affichée ; le filtre de période permet
+de voir toute l’année ou un mois, en combinaison avec la saison et la cause.
+Ces commandes fonctionnent dans le navigateur, sans relancer Python ni recréer la carte.
+Les cercles sont mis à jour pendant le déplacement du curseur ; le zoom et la position
+sont conservés. Les archives sont chargées une fois à l’ouverture de l’onglet.
+Les cercles rouges indiquent les communes
 touchées, avec une position approximative dans chaque commune (ou département si le code
 communal manque). La carte se limite à la France métropolitaine ; les filtres permettent
 de parcourir les mois, les saisons et les causes. Le fond OpenStreetMap est le même
@@ -49,7 +56,14 @@ cp ifm_plus/data/raw/incendies/incendies_2025_2025.csv ifm_plus/data/raw/incendi
 ```
 
 Ce CSV est local et reste hors Git. Sans ce fichier, l’onglet affiche une indication
-sur les données manquantes ; les autres cartes restent disponibles.
+sur les données manquantes si aucun autre export n’est disponible. Les années proposées
+correspondent aux CSV présents. Pour récupérer aussi 2006–2024, utilisez la commande
+`ml/download_bdiff.py --out ifm_plus/data/raw/manual/bdiff` avec le Python du projet.
+Les deux dossiers sont montés dans Docker. Les coordonnées approximatives des communes
+proviennent du cache IGN ADMIN EXPRESS COG CARTO (Licence Ouverte 2.0) et peuvent être
+régénérées avec `ifm_plus/.venv/bin/python ml/build_fire_centroids.py`. Les anciens codes
+non localisés sont représentés au centre du département, avec cette précision indiquée
+dans l’infobulle et dans un compteur, ou signalés comme non cartographiés.
 
 La jauge représente le temps de façon continue, avec un histogramme de disponibilité et un
 curseur déplaçable. La jauge, les compteurs et la carte Leaflet sont conservés dans un même

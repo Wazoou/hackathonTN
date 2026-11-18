@@ -37,10 +37,12 @@ services:
       ARCHIVE_DIR: /archives
       RISK_DIR: /risk
       FIRE_DATA_PATH: /incendies/Incendies.csv
+      BDIFF_DIR: /bdiff
     volumes:
       - ./archives-data:/archives:ro,z
-      - ./pyro-watch-risque-france-bdiff/risk-data:/risk:ro,z
+      - ${RISK_DATA_DIR:-./risk-data}:/risk:ro,z
       - ./ifm_plus/data/raw/incendies:/incendies:ro,z
+      - ./ifm_plus/data/raw/manual/bdiff:/bdiff:ro,z
     depends_on: [api]
     restart: unless-stopped
 

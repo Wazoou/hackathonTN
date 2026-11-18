@@ -110,15 +110,8 @@ with patch("timeline_gauge.render", return_value=None) as gauge:
     assert not at.exception, at.exception
     assert not at.metric
     assert not at.radio
-    month_slider = at.select_slider(key="fire_history_month")
-    assert month_slider.value.startswith("2025-")
-    month_slider.set_value("2025-01").run()
-    assert not at.exception, at.exception
-    assert at.session_state["fire_history_month"] == "2025-01"
-    assert at.select_slider(key="fire_history_month").value == "2025-01"
-    at.select_slider(key="fire_history_month").set_value("2025-01").run()
-    assert not at.exception, at.exception
-    assert at.session_state["fire_history_month"] == "2025-01"
+    assert not at.slider and not at.select_slider
+    assert len(at.get('iframe')) == 1  # Filters now live inside the persistent map.
     at.button(key="mode_archives").click().run()
     assert not at.exception, at.exception
     print("Période vide, lecture, simulation et historique des incendies : OK")
