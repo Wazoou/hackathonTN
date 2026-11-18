@@ -132,3 +132,27 @@ tar -czf pyro-watch-images.tar.gz \
 
 L’archive est ignorée par Git. Partagez-la par votre espace de fichiers de groupe ;
 les fichiers Parquet de téléchargement et les poids YOLO ne sont pas nécessaires pour la carte.
+
+
+## Ajouter LIVE et PRÉDICTION
+
+Partager aussi le dossier **`risk-data/meteo/`**, en incluant désormais
+**`live_initial_state.npz`** (environ 16 Ko). Ce fichier permet de prolonger les
+indices de sécheresse sans télécharger les données brutes de la France.
+
+```bash
+docker compose up --build -d weather dashboard
+```
+
+Le collecteur récupère ensuite Open-Meteo toutes les 90 minutes et publie aujourd’hui
+ainsi que J+1 à J+7. Les nouvelles archives restent dans `data/weather/`, hors Git.
+Le PC doit rester allumé pour les collectes automatiques. Consulter
+[LIVE_PREDICTION.md](LIVE_PREDICTION.md) pour préparer le fichier initial, partager
+une archive opérationnelle et éviter plusieurs collecteurs pour le groupe.
+
+
+Pour les journées anciennes manquées (J−7 et avant), le collecteur utilise désormais
+les observations publiques Météo-France. Le dossier de données brutes déjà présent
+est réutilisé en lecture seule ; il n’est pas nécessaire de l’envoyer à toute l’équipe.
+Si les fichiers sont absents, les seuls lots nécessaires sont téléchargés dans
+`data/weather/meteo-france/`. Ce rattrapage ne consomme pas le quota Open-Meteo.

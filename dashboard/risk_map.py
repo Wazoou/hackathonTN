@@ -92,7 +92,7 @@ def load_daily(signature, ids, observations=()):
                                   'lon': located['longitude'], 'lat': located['latitude'],
                                   'dept': located.get('Département', located['Code INSEE'].str[:2]).str.strip().str.zfill(2)})
             fires = pd.concat([fires, extra], ignore_index=True)
-    return {'meta': meta, 'model': model, 'dates': dates, 'z': npz['z'], 'fwi': npz['fwi'],
+    return {'meta': meta, 'model': model, 'dates': dates, 'z': npz['z'], 'fwi': npz['fwi'], 'station_ids': list(stations),
             'commune_station': commune_station, 'commune_terrain': commune_terrain,
             'cell_commune': cell_commune, 'cell_share': cell_share, 'fires': fires,
             'bdiff_end': bdiff_end}
@@ -160,4 +160,5 @@ def risk_map():
     else:
         st.caption('La couche quotidienne sera disponible après ajout du dossier risk-data/meteo/ (voir DONNEES_EQUIPE.md).')
     _component(payload=payload['payload'], version=payload['version'], weather=weather,
+               live_url=os.getenv('WEATHER_PUBLIC_URL', '/app/static/weather/current.json'),
                key='national_risk_map', default=None)

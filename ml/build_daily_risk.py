@@ -293,6 +293,8 @@ def main():
     np.savez_compressed(out / "meteo.npz", dates=days.strftime("%Y-%m-%d").to_numpy().astype("U10"),
                         stations=np.array(ids, dtype="U8"),
                         z=grid(weather_z(published, indices)), fwi=grid(indices["fwi"].round(1).to_numpy()))
+    from live_state import save_state
+    save_state(out, indices, ids, days[-1])
     (out / "indices.csv.gz").unlink(missing_ok=True)  # ancien format
     stations.reset_index().to_json(out / "stations.json", orient="records", force_ascii=False, indent=1)
     (out / "mailles.json").write_text(json.dumps(

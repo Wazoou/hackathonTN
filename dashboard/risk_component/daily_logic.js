@@ -36,8 +36,41 @@ function computeDay(data,index){
  }
  const key=data.dates[index];
  return {key,label:key.split('-').reverse().join('/'),values,fwi,expected,
-         fires:data.fires[key]||[],known:key<=data.bdiff_end,legend:data.legend};
+         fires:data.fires[key]||[],known:key<=data.bdiff_end,legend:data.legend,
+         revision:data.revisions?.[index]||'history',provenance:data.provenance?.[index]||null};
 }
-const api={unpack,computeDay};
+function withOperational(history,operational){
+ if(!operational)return history;
+ if(operational.model_version!==history.model_version||
+    JSON.stringify(operational.stations)!==JSON.stringify(history.station_ids))
+  throw new Error('Le modèle LIVE et les stations ne correspondent pas à cet historique');
+ const count=history.stations,byDate=new Map(history.dates.map((key,index)=>[key,{index,history:true}]));
+ if(operational.dates.length!==operational.z.length||operational.dates.length!==operational.fwi.length||
+    operational.dates.length!==operational.provenance.length)throw new Error('Dates LIVE incompatibles');
+ for(let i=0;i<operational.dates.length;i++){
+  const key=operational.dates[i];
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(key)||operational.z[i].length!==count||operational.fwi[i].length!==count||
+     !operational.z[i].every(v=>typeof v==='number'&&Number.isFinite(v))||
+     !operational.fwi[i].every(v=>typeof v==='number'&&Number.isFinite(v)))throw new Error('Météo LIVE incomplète');
+  // Never overwrite the original station-observation history with modelled weather.
+  if(key>history.dates.at(-1))byDate.set(key,{index:i,history:false});
+ }
+ const dates=[...byDate.keys()].sort(),z=new Float32Array(dates.length*count),fwi=new Float32Array(z.length),
+  expected=new Float64Array(dates.length),provenance=[],revisions=[];
+ for(let i=0;i<dates.length;i++){
+  const row=byDate.get(dates[i]),j=row.index;
+  if(row.history){
+   z.set(history.z.subarray(j*count,(j+1)*count),i*count);fwi.set(history.fwi.subarray(j*count,(j+1)*count),i*count);
+   expected[i]=history.expected[j];provenance.push(null);revisions.push('history');
+  }else{
+   z.set(operational.z[j],i*count);fwi.set(operational.fwi[j],i*count);
+   let sum=0;for(let c=0;c<history.commune_station.length;c++)sum+=1/(1+Math.exp(-z[i*count+history.commune_station[c]]-history.coefficient*history.commune_terrain[c]));
+   expected[i]=sum;provenance.push({source:operational.source,...operational.provenance[j]});
+   revisions.push(operational.provenance[j].issued_at);
+  }
+ }
+ return {...history,dates,z,fwi,expected,provenance,revisions};
+}
+const api={unpack,computeDay,withOperational};
 if(typeof module==='object'&&module.exports)module.exports=api;else root.DailyLogic=api;
 })(typeof window==='object'?window:globalThis);

@@ -13,4 +13,4 @@ ENV STREAMLIT_THEME_BASE=light \
     STREAMLIT_THEME_BACKGROUND_COLOR="#f3f5f4" \
     STREAMLIT_THEME_SECONDARY_BACKGROUND_COLOR="#ffffff" \
     STREAMLIT_THEME_TEXT_COLOR="#253747"
-CMD ["streamlit", "run", "app.py", "--server.address=0.0.0.0", "--server.port=8501", "--browser.gatherUsageStats=false"]
+CMD ["streamlit", "run", "app.py", "--server.address=0.0.0.0", "--server.port=8501", "--server.enableStaticServing=true", "--browser.gatherUsageStats=false"]

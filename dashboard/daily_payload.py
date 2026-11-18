@@ -7,7 +7,16 @@ import struct
 
 import numpy as np
 
-from daily_data import DAY_BOUNDS, DAY_COLORS, DAY_LABELS
+try:
+    from .daily_data import DAY_BOUNDS, DAY_COLORS, DAY_LABELS
+except ImportError:
+    from daily_data import DAY_BOUNDS, DAY_COLORS, DAY_LABELS
+
+
+def model_signature(model, stations):
+    """Bind operational weather to the frozen model and exact historical station order."""
+    raw = json.dumps({'model': model, 'stations': list(stations)}, sort_keys=True, separators=(',', ':'))
+    return hashlib.sha256(raw.encode()).hexdigest()
 
 
 def build_daily_payload(d):
@@ -32,7 +41,9 @@ def build_daily_payload(d):
               'legend': [[name, str(DAY_BOUNDS[i]).replace('.', ','),
                           str(DAY_BOUNDS[i + 1]).replace('.', ',') if i < 4 else None, list(rgb)]
                          for i, (name, rgb) in enumerate(zip(DAY_LABELS, DAY_COLORS))],
-              'arrays': {}, 'meta': d['meta']}
+              'arrays': {}, 'meta': d['meta'],
+              'model_version': model_signature(d['model'], d['station_ids']) if 'station_ids' in d else None,
+              'station_ids': d.get('station_ids', [])}
     arrays = {'z': weather, 'fwi': np.asarray(d['fwi'][start:], dtype='<f4'),
               'commune_station': np.asarray(d['commune_station'], dtype='<i4'),
               'commune_terrain': terrain, 'cell_commune': np.asarray(d['cell_commune'], dtype='<i4'),
