@@ -35,7 +35,7 @@ services:
     environment:
       API_URL: http://api:8000
       ARCHIVE_DIR: /archives
-      CAMERAS_JSON_PATH: /camera-directory/cameras.json
+      CAMERAS_JSON_PATH: /camera-directory/camera.json
       RISK_DIR: /risk
       FIRE_DATA_PATH: /incendies/Incendies.csv
       BDIFF_DIR: /bdiff

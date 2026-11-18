@@ -176,20 +176,35 @@ Pyro-SDIS est inconnu et la correspondance exacte des heures entre sources n’e
 Vérification du parcours après import :
 `docker compose exec -T dashboard python - < tests/check_webcam_ui.py`.
 
-## Annuaire de flux webcam YouTube
+## Annuaire de webcams et de flux vidéo
 
-Générer l’annuaire avec une clé YouTube Data API et le maillage des risques :
+Ajoutez une ligne par webcam dans `camera-data\cameras.csv` avec son URL et sa ville :
 
-```powershell
-$env:YOUTUBE_API_KEY = "votre-cle-api"
-python ml\build_camera_directory.py --mesh "ifm_plus\data\raw\dfci\dfci_2km.gpkg" --id-column id_carreau_dfci
+```csv
+url_youtube;ville
+https://www.youtube.com/watch?v=VIDEO_ID;Lyon
+https://youtu.be/VIDEO_ID;Biarritz
+https://opencctv.org/still/1.jpg;Grenoble
 ```
 
-Par défaut, le script écrit `camera-data/cameras.json` et `camera-data/cameras.sqlite`.
-Le dashboard lit le JSON depuis ce dossier (également monté dans Docker) ; ouvrez
-**Webcam → Flux YouTube**, puis cliquez sur un repère pour lire le direct. Les archives
-restent disponibles sous **Archives enregistrées**. Les flux sont vérifiés comme actifs
-au moment de la génération ; leur disponibilité peut évoluer ensuite.
+Puis, depuis la racine du dépôt, lancez :
+
+```powershell
+python ml\build_camera_directory.py
+```
+
+Le script accepte les séparateurs virgule ou point-virgule, géolocalise les villes et place
+chaque webcam dans une maille du maillage des risques. À chaque exécution, il recrée
+`camera-data\camera.json` avec exactement les webcams du CSV : ajouter ou supprimer une
+ligne se répercute sur la carte. Un CSV sans webcam vide aussi l’annuaire. Une connexion
+Internet est nécessaire pour géolocaliser les villes ; aucune clé YouTube n’est requise.
+
+Le dashboard lit le JSON depuis `camera-data` (également monté dans Docker) ; ouvrez
+**Webcam → Webcams**, puis cliquez sur un repère. Les URL YouTube, les images JPG/PNG
+(instantanés actualisés périodiquement), les vidéos et flux directs reconnus sont affichés
+dans le dashboard. Les pages web de diffuseurs qui ne sont pas des flux vidéo directs
+s'ouvrent sur leur site, car certaines interdisent l'intégration. Les archives restent
+disponibles sous **Archives enregistrées**.
 
 ## 🔥 IFM+ et carte de risque de départ de feu (prévention)
 

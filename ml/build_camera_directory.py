@@ -1,182 +1,51 @@
-"""Build a French YouTube Live webcam directory joined to a risk-cell mesh.
+"""Create a webcam directory from a CSV of links and French cities.
 
-Requirements are available in ``ifm_plus/requirements.txt``. Set
-``YOUTUBE_API_KEY`` in the environment, then run, for example:
+Accepts every kind of webcam source: YouTube live/recorded videos, periodic
+image URLs (JPG/PNG refreshed by the provider), HLS/MJPEG streams, etc.
 
-    python ml/build_camera_directory.py --mesh path/to/mon_maillage.parquet \
-        --id-column id_carreau_dfci
+Run from the repository root:
 
-The YouTube Data API is used only for public live metadata; this script does
-not download or store video. Missing coordinates are geocoded through
-Nominatim, at its public-service rate limit.
+    python ml/build_camera_directory.py
+
+The script reads camera-data/cameras.csv, geocodes each city through the public
+French Address API, and places the point in the risk-cell mesh. No API key is
+needed.
 """
 from __future__ import annotations
 
 import argparse
-import html
+import csv
 import json
 import math
-import os
 import re
-import sqlite3
 import tempfile
-import time
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any
+from urllib.parse import urlparse
 
 import geopandas as gpd
 import pandas as pd
 import requests
 
 
-YOUTUBE_API = "https://www.googleapis.com/youtube/v3"
-NOMINATIM_API = "https://nominatim.openstreetmap.org/search"
+ADRESSE_API = "https://api-adresse.data.gouv.fr/search/"
 OUTPUT_FIELDS = ("nom", "url_youtube", "lat", "lon", "id_maille")
-SEARCH_QUERIES = (
-    "webcam forêt vallée France en direct",
-    "webcam montagne forêt France live",
-    "webcam littoral plage côte France en direct",
-    "webcam parc naturel France live",
-    "webcam office de tourisme village station France live",
-    "webcam live Alpes France",
-    "webcam live Pyrénées France",
-    "webcam live Corse",
-    "webcam live Var Provence Côte d'Azur",
-    "webcam live Landes Gironde",
-    "webcam live Ardèche Cévennes",
-    "webcam live Massif Central Auvergne",
-    "webcam live Vosges Jura",
-    "webcam live Bretagne Normandie",
-    "webcam météo France en direct",
-)
-GEOCODING_STOP_WORDS = re.compile(
-    r"\b(?:office\s+de\s+tourisme|syndicat\s+d['’]initiative|mairie\s+de|"
-    r"webcam|livecam|cam[eé]ra|camera|en\s+direct|en\s+continu|direct|live|"
-    r"stream|streaming|panoramique|panorama|vue\s+sur|vue|m[eé]t[eé]o|meteo|"
-    r"station\s+de\s+ski|station|domaine\s+skiable|france|uhd|4k|hd|fhd|"
-    r"24/7|24h/24|7j/7|\d{3,4}\s*m)\b",
-    flags=re.IGNORECASE,
-)
+VALID_SCHEMES = {"http", "https"}
+_URL_RE = re.compile(r"^https?://[^\s/$.?#].[^\s]*$", re.IGNORECASE)
 
 
-def request_json(
-    session: requests.Session,
-    url: str,
-    params: Mapping[str, Any],
-    *,
-    timeout: float = 25,
-) -> dict[str, Any]:
-    """Fetch JSON and surface API/network failures without leaking query keys."""
-    for attempt in range(3):
-        try:
-            response = session.get(url, params=params, timeout=timeout)
-        except requests.RequestException as error:
-            if attempt == 2:
-                raise RuntimeError(
-                    f"Request to {url.split('?')[0]} failed ({type(error).__name__})."
-                ) from error
-            time.sleep(2**attempt)
-            continue
-
-        if response.status_code == 429 or response.status_code >= 500:
-            if attempt < 2:
-                retry_after = response.headers.get("Retry-After")
-                try:
-                    delay = min(30.0, max(1.0, float(retry_after))) if retry_after else 2**attempt
-                except ValueError:
-                    delay = 2**attempt
-                time.sleep(delay)
-                continue
-        if response.status_code >= 400:
-            try:
-                detail = response.json().get("error", {}).get("message", "")
-            except (ValueError, AttributeError):
-                detail = ""
-            message = f"HTTP {response.status_code}"
-            if detail:
-                message += f": {detail}"
-            raise RuntimeError(f"Request to {url.split('?')[0]} failed ({message}).")
-        try:
-            payload = response.json()
-        except ValueError as error:
-            raise RuntimeError(f"Invalid JSON returned by {url.split('?')[0]}.") from error
-        if not isinstance(payload, dict):
-            raise RuntimeError(f"Unexpected JSON response from {url.split('?')[0]}.")
-        if "error" in payload:
-            detail = payload["error"].get("message", "Unknown API error")
-            raise RuntimeError(f"API error from {url.split('?')[0]}: {detail}")
-        return payload
-    raise RuntimeError(f"Request to {url.split('?')[0]} failed after retries.")
+def is_valid_webcam_url(url: str) -> bool:
+    """Accept any http(s) URL pointing to a webcam feed or player page."""
+    if not url or not isinstance(url, str):
+        return False
+    if not _URL_RE.match(url.strip()):
+        return False
+    parsed = urlparse(url)
+    return parsed.scheme.lower() in VALID_SCHEMES and bool(parsed.hostname)
 
 
-def discover_live_video_ids(
-    session: requests.Session,
-    api_key: str,
-    queries: Sequence[str] = SEARCH_QUERIES,
-    results_per_query: int = 25,
-) -> list[str]:
-    """Search active public broadcasts and deduplicate their YouTube IDs."""
-    video_ids: list[str] = []
-    seen: set[str] = set()
-    for query in queries:
-        result = request_json(
-            session,
-            f"{YOUTUBE_API}/search",
-            {
-                "key": api_key,
-                "part": "snippet",
-                "q": query,
-                "type": "video",
-                "eventType": "live",
-                "regionCode": "FR",
-                "relevanceLanguage": "fr",
-                "maxResults": results_per_query,
-            },
-        )
-        for item in result.get("items", []):
-            video_id = item.get("id", {}).get("videoId")
-            if video_id and video_id not in seen:
-                seen.add(video_id)
-                video_ids.append(video_id)
-    return video_ids
-
-
-def is_active_public_live(video: Mapping[str, Any]) -> bool:
-    """Reject upcoming, ended, and non-public broadcasts."""
-    snippet = video.get("snippet") or {}
-    live = video.get("liveStreamingDetails") or {}
-    status = video.get("status") or {}
-    return (
-        snippet.get("liveBroadcastContent") == "live"
-        and status.get("privacyStatus") == "public"
-        and bool(live.get("actualStartTime"))
-        and not live.get("actualEndTime")
-    )
-
-
-def fetch_active_live_videos(
-    session: requests.Session,
-    api_key: str,
-    video_ids: Sequence[str],
-) -> list[dict[str, Any]]:
-    """Fetch full metadata in API-sized batches and recheck live status."""
-    videos: list[dict[str, Any]] = []
-    for start in range(0, len(video_ids), 50):
-        result = request_json(
-            session,
-            f"{YOUTUBE_API}/videos",
-            {
-                "key": api_key,
-                "part": "snippet,liveStreamingDetails,recordingDetails,status",
-                "id": ",".join(video_ids[start : start + 50]),
-                "maxResults": 50,
-            },
-        )
-        videos.extend(video for video in result.get("items", []) if is_active_public_live(video))
-    return videos
-
-
-def valid_coordinates(lat: Any, lon: Any) -> tuple[float, float] | None:
+def valid_coordinates(lat: object, lon: object) -> tuple[float, float] | None:
     """Return finite WGS84 coordinates, or None for absent/invalid values."""
     try:
         latitude, longitude = float(lat), float(lon)
@@ -188,212 +57,119 @@ def valid_coordinates(lat: Any, lon: Any) -> tuple[float, float] | None:
         return None
     return latitude, longitude
 
-def _clean_geo_text(text: str) -> str | None:
-    cleaned = GEOCODING_STOP_WORDS.sub(" ", html.unescape(text))
-    # Retire les émojis / caractères spéciaux tout en gardant lettres, chiffres, tirets et apostrophes
-    cleaned = re.sub(r"[^\w\s'\-àâäéèêëïîôöùûüçÀÂÄÉÈÊËÎÏÔÖÙÛÜÇ]", " ", cleaned)
-    cleaned = re.sub(r"\s+", " ", cleaned).strip(" .-_")
-    cleaned = re.sub(
-        r"^(?:de\s+la|de\s+l['’]|du|des|de|d['’]|à|au|aux|sur|en|le|la|les|l['’])\s+",
-        "",
-        cleaned,
-        flags=re.IGNORECASE,
-    ).strip(" .-_")
-    if len(cleaned) < 3 or cleaned.isdigit():
-        return None
-    return cleaned
 
+def geocode_city(session: requests.Session, city: str) -> tuple[float, float]:
+    """Resolve a French commune name without a key, rejecting ambiguous matches."""
+    try:
+        response = session.get(
+            ADRESSE_API,
+            params={"q": city, "type": "municipality", "limit": 5},
+            timeout=15,
+        )
+        response.raise_for_status()
+    except requests.RequestException as error:
+        raise RuntimeError(f"Impossible de géolocaliser « {city} » : service indisponible.") from error
 
-def build_location_queries(
-    title: str,
-    location_description: str | None = None,
-    channel_title: str | None = None,
-) -> list[str]:
-    """Génère plusieurs pistes de lieu (segments du titre, description, chaîne)."""
-    raw_candidates: list[str] = []
-    if location_description:
-        raw_candidates.append(location_description)
+    try:
+        payload = response.json()
+    except ValueError as error:
+        raise RuntimeError("Réponse invalide du service de géolocalisation.") from error
+    if not isinstance(payload, Mapping) or not isinstance(payload.get("features"), list):
+        raise RuntimeError("Réponse invalide du service de géolocalisation.")
 
-    # Découpe sur les séparateurs avec espaces (pour garder les noms comme Saint-Tropez)
-    parts = re.split(r"\s+[-–—|/:•]\s+|[()\[\]]", html.unescape(title))
-    raw_candidates.extend(parts)
-    raw_candidates.append(title)
-    if channel_title:
-        raw_candidates.append(channel_title)
-
-    queries: list[str] = []
-    seen: set[str] = set()
-    for raw in raw_candidates:
-        cleaned = _clean_geo_text(raw)
-        if not cleaned:
+    matches: list[tuple[float, tuple[float, float], str]] = []
+    for feature in payload["features"]:
+        if not isinstance(feature, Mapping):
             continue
-        query = cleaned if re.search(r"\bfrance\b", cleaned, flags=re.IGNORECASE) else f"{cleaned}, France"
-        key = query.casefold()
-        if key not in seen:
-            seen.add(key)
-            queries.append(query)
-    return queries
+        properties = feature.get("properties")
+        geometry = feature.get("geometry")
+        if not isinstance(properties, Mapping) or not isinstance(geometry, Mapping):
+            continue
+        if properties.get("type") != "municipality":
+            continue
+        coordinates = geometry.get("coordinates")
+        if not isinstance(coordinates, list) or len(coordinates) < 2:
+            continue
+        point = valid_coordinates(coordinates[1], coordinates[0])
+        if point is None:
+            continue
+        try:
+            score = float(properties.get("score", 0))
+        except (TypeError, ValueError):
+            continue
+        if score >= 0.45:
+            label = str(properties.get("city") or properties.get("name") or city)
+            matches.append((score, point, label))
 
-
-def video_to_candidate(video: Mapping[str, Any]) -> dict[str, Any] | None:
-    """Extract the title, canonical URL, source coordinates, and geocoding hints."""
-    video_id = video.get("id")
-    snippet = video.get("snippet") or {}
-    title = str(snippet.get("title") or "").strip()
-    channel_title = str(snippet.get("channelTitle") or "").strip() or None
-    if not video_id or not title:
-        return None
-    recording = video.get("recordingDetails") or {}
-    location = recording.get("location") or {}
-    coordinates = valid_coordinates(location.get("latitude"), location.get("longitude"))
-    location_description = recording.get("locationDescription")
-    if not isinstance(location_description, str):
-        location_description = None
-    return {
-        "nom": title,
-        "url_youtube": f"https://www.youtube.com/watch?v={video_id}",
-        "lat": coordinates[0] if coordinates else None,
-        "lon": coordinates[1] if coordinates else None,
-        "_location_queries": build_location_queries(title, location_description, channel_title),
+    if not matches:
+        raise ValueError(f"Ville « {city} » introuvable. Vérifiez son nom.")
+    matches.sort(key=lambda result: result[0], reverse=True)
+    best_score, best_point, _ = matches[0]
+    alternatives = {
+        point
+        for score, point, label in matches
+        if score >= best_score - 0.05 and point != best_point
     }
+    if alternatives:
+        raise ValueError(
+            f"Ville « {city} » ambiguë. Ajoutez son département, par exemple « {city}, 33 »."
+        )
+    return best_point
 
 
-class NominatimGeocoder:
-    """Geocoder France (API Adresse en priorité, Nominatim en secours sans crash)."""
+def read_camera_csv(
+    path: Path,
+    *,
+    output_fn: Callable[[str], None] = print,
+) -> list[dict[str, str]]:
+    """Read and validate URL/city rows from a comma- or semicolon-separated CSV."""
+    if not path.is_file():
+        raise FileNotFoundError(f"Fichier CSV introuvable : {path}")
 
-    def __init__(
-        self,
-        session: requests.Session,
-        *,
-        user_agent: str,
-        min_interval: float = 1.1,
-        max_requests: int = 80,
-    ) -> None:
-        self.session = session
-        self.user_agent = user_agent
-        self.min_interval = min_interval
-        self.max_requests = max_requests
-        self.requests_made = 0
-        self._last_request_at: float | None = None
-        self._cache: dict[str, tuple[float, float] | None] = {}
+    with path.open(encoding="utf-8-sig", newline="") as handle:
+        first_line = handle.readline()
+        delimiter = ";" if first_line.count(";") >= first_line.count(",") else ","
+        handle.seek(0)
+        reader = csv.DictReader(handle, delimiter=delimiter)
+        if not reader.fieldnames:
+            raise ValueError(f"Le CSV {path} est vide. Ajoutez les colonnes url_youtube et ville.")
+        columns = {
+            field.strip().casefold(): field
+            for field in reader.fieldnames
+            if field and field.strip()
+        }
+        if "url_youtube" not in columns or "ville" not in columns:
+            raise ValueError(
+                f"Le CSV {path} doit contenir les colonnes url_youtube et ville."
+            )
 
-    @property
-    def can_request(self) -> bool:
-        return self.requests_made < self.max_requests
-
-    def geocode(self, query: str) -> tuple[float, float] | None:
-        normalized = query.strip().casefold()
-        if normalized in self._cache:
-            return self._cache[normalized]
-
-        # 1. API Adresse officielle française (on garde uniquement commune / lieu-dit)
-        clean_query = re.sub(r",?\s*france$", "", query, flags=re.IGNORECASE).strip()
-        if clean_query:
-            try:
-                ban_resp = self.session.get(
-                    "https://api-adresse.data.gouv.fr/search/",
-                    params={"q": clean_query, "limit": 3},
-                    timeout=10,
+        seen_urls: set[str] = set()
+        cameras: list[dict[str, str]] = []
+        for line_number, row in enumerate(reader, start=2):
+            if None in row:
+                raise ValueError(f"Ligne {line_number} du CSV {path} : trop de colonnes.")
+            url = (row.get(columns["url_youtube"]) or "").strip()
+            city = (row.get(columns["ville"]) or "").strip()
+            if not url and not city:
+                continue
+            if not url or not city:
+                raise ValueError(
+                    f"Ligne {line_number} du CSV {path} : URL de webcam et ville obligatoires."
                 )
-                if ban_resp.ok:
-                    for feat in ban_resp.json().get("features") or []:
-                        props = feat.get("properties") or {}
-                        if props.get("type") not in {"municipality", "locality"}:
-                            continue
-                        if props.get("score", 0) < 0.45:
-                            continue
-                        coords = (feat.get("geometry") or {}).get("coordinates") or []
-                        if len(coords) >= 2:
-                            coordinates = valid_coordinates(coords[1], coords[0])
-                            if coordinates:
-                                self._cache[normalized] = coordinates
-                                return coordinates
-            except (requests.RequestException, ValueError, KeyError, TypeError):
-                pass
-
-        # 2. Secours via Nominatim (si API Adresse n'a rien trouvé)
-        if not self.can_request:
-            self._cache[normalized] = None
-            return None
-
-        coordinates = None
-        for attempt in range(2):
-            if self._last_request_at is not None:
-                elapsed = time.monotonic() - self._last_request_at
-                if elapsed < self.min_interval:
-                    time.sleep(self.min_interval - elapsed)
-            self._last_request_at = time.monotonic()
-            if attempt == 0:
-                self.requests_made += 1
-            try:
-                response = self.session.get(
-                    NOMINATIM_API,
-                    params={
-                        "q": query,
-                        "format": "jsonv2",
-                        "limit": 5,
-                        "countrycodes": "fr",
-                        "addressdetails": 1,
-                    },
-                    headers={"User-Agent": self.user_agent},
-                    timeout=20,
-                )
-            except requests.RequestException:
-                time.sleep(2)
+            if not is_valid_webcam_url(url):
+                raise ValueError(f"Ligne {line_number} du CSV {path} : URL de webcam non valide.")
+            if url in seen_urls:
+                output_fn(f"Ligne {line_number} : lien déjà présent, ignoré ({url}).")
                 continue
-
-            if response.status_code in (429, 500, 502, 503, 504):
-                time.sleep(2 * (attempt + 1))
-                continue
-            if response.status_code >= 400:
-                break
-
-            try:
-                results = response.json()
-            except ValueError:
-                break
-            if isinstance(results, list):
-                for result in results:
-                    address = result.get("address", {})
-                    if address.get("country_code", "").casefold() != "fr":
-                        continue
-                    coordinates = valid_coordinates(result.get("lat"), result.get("lon"))
-                    if coordinates:
-                        break
-            break
-
-        self._cache[normalized] = coordinates
-        return coordinates
-
-
-def resolve_candidate_locations(
-    candidates: Sequence[dict[str, Any]],
-    geocoder: NominatimGeocoder,
-) -> tuple[list[dict[str, Any]], int]:
-    """Fill missing GPS values by trying each extracted location hint."""
-    resolved: list[dict[str, Any]] = []
-    unresolved = 0
-    for candidate in candidates:
-        camera = dict(candidate)
-        queries = camera.pop("_location_queries", [])
-        if camera["lat"] is None or camera["lon"] is None:
-            coordinates = None
-            for query in queries:
-                coordinates = geocoder.geocode(query)
-                if coordinates:
-                    break
-            if not coordinates:
-                unresolved += 1
-                continue
-            camera["lat"], camera["lon"] = coordinates
-        resolved.append(camera)
-    return resolved, unresolved
+            seen_urls.add(url)
+            cameras.append({"nom": city, "url_youtube": url})
+    return cameras
 
 
 def read_mesh(mesh_path: Path) -> gpd.GeoDataFrame:
     """Load a GeoParquet/Parquet or vector file as a georeferenced mesh."""
     if not mesh_path.is_file():
-        raise FileNotFoundError(f"Mesh file does not exist: {mesh_path}")
+        raise FileNotFoundError(f"Maillage introuvable : {mesh_path}")
     if mesh_path.suffix.casefold() in {".parquet", ".pq"}:
         return gpd.read_parquet(mesh_path)
     return gpd.read_file(mesh_path)
@@ -402,28 +178,26 @@ def read_mesh(mesh_path: Path) -> gpd.GeoDataFrame:
 def validate_mesh(mesh: gpd.GeoDataFrame, id_column: str) -> str:
     """Validate the mesh and return its active geometry-column name."""
     if id_column not in mesh.columns:
-        raise ValueError(f"Mesh identifier column not found: {id_column}")
+        raise ValueError(f"Colonne d’identifiant de maille absente : {id_column}")
     if mesh.crs is None:
-        raise ValueError("Mesh CRS is missing; assign its correct CRS before joining.")
+        raise ValueError("Le système de coordonnées du maillage est absent.")
     try:
         geometry_column = mesh.geometry.name
     except AttributeError as error:
-        raise ValueError("Mesh has no active geometry column.") from error
+        raise ValueError("Le maillage ne contient pas de géométrie active.") from error
     if geometry_column not in mesh.columns:
-        raise ValueError("Mesh geometry column is missing.")
+        raise ValueError("La colonne de géométrie du maillage est absente.")
     if "__id_maille" in mesh.columns:
-        raise ValueError("Mesh already contains the reserved column '__id_maille'.")
-    if id_column == geometry_column:
-        raise ValueError("Mesh identifier column cannot be the geometry column.")
-    if mesh[id_column].isna().any():
-        raise ValueError(f"Mesh identifier column contains null values: {id_column}")
+        raise ValueError("Le maillage contient déjà la colonne réservée '__id_maille'.")
+    if id_column == geometry_column or mesh[id_column].isna().any():
+        raise ValueError(f"Colonne d’identifiant de maille invalide : {id_column}")
     if mesh[id_column].astype(str).duplicated().any():
-        raise ValueError(f"Mesh identifier column contains duplicates: {id_column}")
+        raise ValueError(f"Identifiants de maille en double : {id_column}")
     if mesh.geometry.isna().any() or mesh.geometry.is_empty.any():
-        raise ValueError("Mesh contains missing or empty geometries.")
+        raise ValueError("Le maillage contient des géométries absentes ou vides.")
     geometry_types = set(mesh.geometry.geom_type.dropna())
     if not geometry_types or not geometry_types.issubset({"Polygon", "MultiPolygon"}):
-        raise ValueError("Mesh geometries must be Polygon or MultiPolygon.")
+        raise ValueError("Les géométries du maillage doivent être des polygones.")
     return geometry_column
 
 
@@ -432,28 +206,18 @@ def assign_cameras_to_mesh(
     mesh: gpd.GeoDataFrame,
     id_column: str,
 ) -> list[dict[str, Any]]:
-    """Spatially join points to polygons and emit only the five public fields."""
+    """Join camera points to risk cells and emit the dashboard's five public fields."""
     geometry_column = validate_mesh(mesh, id_column)
-
-    unique_cameras: list[Mapping[str, Any]] = []
-    seen_urls: set[str] = set()
-    for camera in cameras:
-        url = str(camera["url_youtube"])
-        if url not in seen_urls:
-            if valid_coordinates(camera.get("lat"), camera.get("lon")) is None:
-                raise ValueError(f"Camera has invalid coordinates: {url}")
-            seen_urls.add(url)
-            unique_cameras.append(camera)
-    if not unique_cameras:
+    if not cameras:
         return []
 
     mesh_view = mesh[[id_column, geometry_column]].rename(columns={id_column: "__id_maille"})
     mesh_view = gpd.GeoDataFrame(mesh_view, geometry=geometry_column, crs=mesh.crs).to_crs("EPSG:4326")
     points = gpd.GeoDataFrame(
-        list(unique_cameras),
+        list(cameras),
         geometry=gpd.points_from_xy(
-            [camera["lon"] for camera in unique_cameras],
-            [camera["lat"] for camera in unique_cameras],
+            [camera["lon"] for camera in cameras],
+            [camera["lat"] for camera in cameras],
         ),
         crs="EPSG:4326",
     )
@@ -473,24 +237,20 @@ def assign_cameras_to_mesh(
             predicate="intersects",
         )
         matches = pd.concat([matches, boundary_matches])
-    if matches.empty:
-        return []
 
     matches = matches.assign(__id_sort=matches["__id_maille"].astype(str))
     matches = matches.sort_values(["url_youtube", "__id_sort"], kind="stable")
     matches = matches.drop_duplicates(subset="url_youtube")
-    result: list[dict[str, Any]] = []
-    for _, row in matches.iterrows():
-        result.append(
-            {
-                "nom": str(row["nom"]),
-                "url_youtube": str(row["url_youtube"]),
-                "lat": float(row["lat"]),
-                "lon": float(row["lon"]),
-                "id_maille": str(row["__id_maille"]),
-            }
-        )
-    return result
+    return [
+        {
+            "nom": str(row["nom"]),
+            "url_youtube": str(row["url_youtube"]),
+            "lat": float(row["lat"]),
+            "lon": float(row["lon"]),
+            "id_maille": str(row["__id_maille"]),
+        }
+        for _, row in matches.iterrows()
+    ]
 
 
 def write_json(path: Path, cameras: Sequence[Mapping[str, Any]]) -> None:
@@ -515,146 +275,86 @@ def write_json(path: Path, cameras: Sequence[Mapping[str, Any]]) -> None:
             temporary_path.unlink()
 
 
-def write_sqlite(path: Path, cameras: Sequence[Mapping[str, Any]]) -> None:
-    """Replace the cameras table, whose schema contains exactly OUTPUT_FIELDS."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    connection = sqlite3.connect(path)
-    try:
-        tables = {
-            row[0]
-            for row in connection.execute(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
-            )
-        }
-        if tables - {"cameras"}:
-            raise ValueError(
-                f"SQLite database contains other tables: {', '.join(sorted(tables - {'cameras'}))}. "
-                "Choose a separate output database."
-            )
-        if "cameras" in tables:
-            columns = tuple(row[1] for row in connection.execute("PRAGMA table_info(cameras)"))
-            if columns != OUTPUT_FIELDS:
-                raise ValueError(
-                    "Existing SQLite cameras table has a different schema; choose a new output database."
-                )
-        with connection:
-            connection.execute(
-                "CREATE TABLE IF NOT EXISTS cameras ("
-                "nom TEXT NOT NULL, "
-                "url_youtube TEXT NOT NULL UNIQUE, "
-                "lat REAL NOT NULL, "
-                "lon REAL NOT NULL, "
-                "id_maille TEXT NOT NULL)"
-            )
-            connection.execute("DELETE FROM cameras")
-            connection.executemany(
-                "INSERT INTO cameras (nom, url_youtube, lat, lon, id_maille) "
-                "VALUES (:nom, :url_youtube, :lat, :lon, :id_maille)",
-                cameras,
-            )
-    finally:
-        connection.close()
-
-
 def build_directory(
     *,
-    api_key: str,
     mesh_path: Path,
     id_column: str,
+    input_csv: Path,
     output_json: Path,
-    output_sqlite: Path,
-    queries: Sequence[str] = SEARCH_QUERIES,
-    results_per_query: int = 25,
-    max_geocoding_requests: int = 80,
-    nominatim_user_agent: str,
-) -> tuple[int, int, int]:
-    """Discover, validate, geocode, spatially join, and export webcam streams."""
-    if output_json.resolve() == output_sqlite.resolve():
-        raise ValueError("JSON and SQLite outputs must use different file paths.")
+    output_fn: Callable[[str], None] = print,
+    session: requests.Session | None = None,
+) -> list[dict[str, Any]]:
+    """Rebuild the webcam JSON to exactly match the CSV."""
     mesh = read_mesh(mesh_path)
     validate_mesh(mesh, id_column)
-    session = requests.Session()
-    session.headers.update({"Accept": "application/json"})
-    video_ids = discover_live_video_ids(session, api_key, queries, results_per_query)
-    videos = fetch_active_live_videos(session, api_key, video_ids)
-    candidates = [
-        candidate
-        for video in videos
-        if (candidate := video_to_candidate(video)) is not None
-    ]
-    geocoder = NominatimGeocoder(
-        session,
-        user_agent=nominatim_user_agent,
-        max_requests=max_geocoding_requests,
-    )
-    located, unresolved = resolve_candidate_locations(candidates, geocoder)
-    cameras = assign_cameras_to_mesh(located, mesh, id_column)
-    write_json(output_json, cameras)
-    write_sqlite(output_sqlite, cameras)
-    unmatched_mesh = len(located) - len(cameras)
-    print(
-        f"YouTube IDs: {len(video_ids)}; lives actifs vérifiés: {len(videos)}; "
-        f"sans coordonnées: {unresolved}; hors maillage: {unmatched_mesh}; "
-        f"annuaire exporté: {len(cameras)}."
-    )
-    if geocoder.requests_made >= max_geocoding_requests and unresolved:
-        print(
-            f"Limite Nominatim atteinte ({max_geocoding_requests} requêtes). "
-            "Augmentez --max-geocoding-requests pour traiter davantage de flux."
+    geocoding_session = session or requests.Session()
+    geocoding_session.headers.update({"Accept": "application/geo+json"})
+    csv_cameras = read_camera_csv(input_csv, output_fn=output_fn)
+
+    new_entries: list[dict[str, Any]] = []
+    skipped_geocode: list[str] = []
+    for camera in csv_cameras:
+        try:
+            lat, lon = geocode_city(geocoding_session, camera["nom"])
+        except (ValueError, RuntimeError) as exc:
+            skipped_geocode.append(f"{camera['nom']} ({exc})")
+            output_fn(f"Ville « {camera['nom']} » ignorée : {exc}")
+            continue
+        new_entries.append({**camera, "lat": lat, "lon": lon})
+        output_fn(f"Ville « {camera['nom']} » localisée : {lat:.5f}, {lon:.5f}.")
+
+    if skipped_geocode:
+        output_fn(
+            f"{len(skipped_geocode)} ville(s) ignorée(s) lors du géocodage : "
+            + "; ".join(skipped_geocode[:10])
+            + (" ..." if len(skipped_geocode) > 10 else "")
         )
-    return len(cameras), unresolved, unmatched_mesh
+
+    located = assign_cameras_to_mesh(new_entries, mesh, id_column)
+    located_urls = {camera["url_youtube"] for camera in located}
+    unmatched = [camera["nom"] for camera in new_entries if camera["url_youtube"] not in located_urls]
+    if unmatched:
+        output_fn(
+            f"{len(unmatched)} ville(s) hors du maillage des risques (ignorées) : "
+            + ", ".join(unmatched[:10])
+            + (" ..." if len(unmatched) > 10 else "")
+        )
+
+    write_json(output_json, located)
+    output_fn(f"Annuaire synchronisé avec le CSV : {len(located)} webcam(s) dans {output_json}.")
+    return located
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--mesh", required=True, type=Path, help="Fichier de maillage GeoParquet, Parquet ou vectoriel.")
-    parser.add_argument("--id-column", required=True, help="Nom de la colonne d’identifiant de maille.")
-    parser.add_argument("--output-json", type=Path, default=Path("camera-data/cameras.json"))
-    parser.add_argument("--output-sqlite", type=Path, default=Path("camera-data/cameras.sqlite"))
     parser.add_argument(
-        "--youtube-api-key",
-        default=os.getenv("YOUTUBE_API_KEY"),
-        help="Clé YouTube Data API (ou variable d’environnement YOUTUBE_API_KEY).",
+        "--input-csv",
+        type=Path,
+        default=Path("camera-data/cameras.csv"),
+        help="CSV contenant les colonnes url_youtube et ville.",
     )
     parser.add_argument(
-        "--query",
-        action="append",
-        dest="extra_queries",
-        default=[],
-        help="Requête de recherche supplémentaire (peut être répétée).",
+        "--mesh",
+        type=Path,
+        default=Path("ifm_plus/data/raw/dfci/dfci_2km.gpkg"),
+        help="Maillage des risques GeoParquet, Parquet ou vectoriel.",
     )
-    parser.add_argument("--results-per-query", type=int, default=25, choices=range(1, 51))
-    parser.add_argument("--max-geocoding-requests", type=int, default=80)
-    parser.add_argument(
-        "--nominatim-user-agent",
-        default=os.getenv(
-            "NOMINATIM_USER_AGENT",
-            "PyroWatchWebcamDirectory/1.0 (+https://github.com/Wazoou/hackathonTN)",
-        ),
-        help="User-Agent identifiable pour respecter la politique Nominatim.",
-    )
-    args = parser.parse_args(argv)
-    if not args.youtube_api_key:
-        parser.error("Définissez YOUTUBE_API_KEY avec une clé YouTube Data API.")
-    if args.max_geocoding_requests < 0:
-        parser.error("--max-geocoding-requests must be zero or greater.")
-    args.queries = (*SEARCH_QUERIES, *args.extra_queries)
-    return args
+    parser.add_argument("--id-column", default="id_carreau_dfci", help="Colonne d’identifiant de maille.")
+    parser.add_argument("--output-json", type=Path, default=Path("camera-data/camera.json"))
+    return parser.parse_args(argv)
 
 
 def main(argv: Sequence[str] | None = None) -> None:
     args = parse_args(argv)
-    build_directory(
-        api_key=args.youtube_api_key,
-        mesh_path=args.mesh,
-        id_column=args.id_column,
-        output_json=args.output_json,
-        output_sqlite=args.output_sqlite,
-        queries=args.queries,
-        results_per_query=args.results_per_query,
-        max_geocoding_requests=args.max_geocoding_requests,
-        nominatim_user_agent=args.nominatim_user_agent,
-    )
+    try:
+        build_directory(
+            mesh_path=args.mesh,
+            id_column=args.id_column,
+            input_csv=args.input_csv,
+            output_json=args.output_json,
+        )
+    except (FileNotFoundError, RuntimeError, ValueError) as error:
+        raise SystemExit(f"Erreur : {error}") from error
 
 
 if __name__ == "__main__":

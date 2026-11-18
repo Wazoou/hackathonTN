@@ -1,41 +1,72 @@
-"""Live YouTube webcam map and recorded archive views."""
+"""Live webcam map and recorded archive views.
+
+Supports every kind of webcam source: YouTube live/recorded videos, periodic
+image URLs (JPG/PNG refreshed by the provider), HLS/MJPEG streams, etc.
+"""
 
 import os
+import time
 from pathlib import Path
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import pandas as pd
 import pydeck as pdk
+import requests
 import streamlit as st
+import streamlit.components.v1 as components
 
 from archives import archives
 from interface import section_title
-from webcam_directory import load_camera_directory, selected_camera_url
+from webcam_directory import (
+    load_camera_directory,
+    selected_camera_url,
+    fetch_opencctv_snapshot,
+    webcam_display_type,
+    webcam_embed_url,
+)
 
 CAMERAS_JSON_PATH = Path(
     os.getenv(
         "CAMERAS_JSON_PATH",
-        str(Path(__file__).resolve().parent.parent / "camera-data" / "cameras.json"),
+        str(Path(__file__).resolve().parent.parent / "camera-data" / "camera.json"),
     )
 )
+
+
+def _refreshed_image_url(url: str) -> str:
+    parts = urlsplit(url)
+    query = parse_qsl(parts.query, keep_blank_values=True)
+    query.append(("_pyrowatch_refresh", str(time.time_ns())))
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
+
+
+@st.fragment(run_every="15s")
+def _display_webcam_snapshot(url: str) -> None:
+    if urlsplit(url).hostname == "opencctv.org":
+        try:
+            image = fetch_opencctv_snapshot(url)
+        except requests.RequestException:
+            st.warning("Le diffuseur ne répond pas ou l’image n’est pas accessible.")
+        except ValueError as error:
+            st.warning(f"Impossible d’afficher l’instantané : {error}")
+        else:
+            st.image(image, use_container_width=True)
+    else:
+        st.image(_refreshed_image_url(url), use_container_width=True)
+    st.caption("Image actualisée environ toutes les 15 secondes, selon la fréquence du diffuseur.")
 
 
 def live_webcams() -> None:
     if not CAMERAS_JSON_PATH.is_file():
         st.info(
             f"Aucun annuaire de webcams trouvé ({CAMERAS_JSON_PATH}). "
-            "Depuis la racine du dépôt, définissez votre clé YouTube Data API "
-            "dans PowerShell et générez l’annuaire :"
+            "Ajoutez les URL et les villes dans camera-data/cameras.csv, "
+            "puis lancez le script depuis la racine du dépôt :"
         )
-        st.code(
-            '$env:YOUTUBE_API_KEY = "votre-cle-api"\n'
-            "python ml\\build_camera_directory.py "
-            '--mesh "ifm_plus\\data\\raw\\dfci\\dfci_2km.gpkg" '
-            "--id-column id_carreau_dfci",
-            language="powershell",
-        )
+        st.code("python ml\\build_camera_directory.py", language="powershell")
         st.caption(
-            "Le fichier créé dans camera-data sera visible par Docker ; "
-            "rechargez ensuite cette page. Ne partagez pas votre clé API."
+            "Le script géolocalise les villes du CSV et crée camera-data/camera.json. "
+            "Rechargez ensuite cette page."
         )
         return
     try:
@@ -44,11 +75,11 @@ def live_webcams() -> None:
         st.error(f"Impossible de charger l’annuaire de webcams : {error}")
         return
     if not cameras:
-        st.info("L’annuaire ne contient aucune webcam YouTube.")
+        st.info("L’annuaire ne contient aucune webcam.")
         return
 
     section_title(
-        "Webcams YouTube en direct",
+        "Webcams et flux vidéo",
         "Cliquez sur un repère pour afficher le flux correspondant",
     )
     st.caption(
@@ -104,8 +135,30 @@ def live_webcams() -> None:
         if selected_camera:
             st.markdown(f"### {selected_camera['nom']}")
             st.caption(f"Maille de risque : {selected_camera['id_maille']}")
-            st.video(selected_camera["url_youtube"])
-            st.link_button("Ouvrir sur YouTube", selected_camera["url_youtube"])
+
+            url = selected_camera["url_youtube"]
+            display_type = webcam_display_type(url)
+
+            if display_type == "youtube":
+                components.iframe(webcam_embed_url(url), height=360)
+                st.link_button("Ouvrir sur YouTube", url)
+                st.caption("Si le direct n’est pas intégrable, ouvre-le directement sur YouTube.")
+            elif display_type == "image":
+                _display_webcam_snapshot(url)
+                st.link_button("Ouvrir la webcam", url)
+            elif display_type == "video":
+                st.video(url)
+                st.link_button("Ouvrir le flux", url)
+            elif display_type == "mjpeg":
+                components.iframe(url, height=360)
+                st.link_button("Ouvrir le flux", url)
+            else:
+                st.info(
+                    "Cette URL est une page web plutôt qu’un flux direct ; "
+                    "ouvrez-la sur le site du diffuseur."
+                )
+                st.link_button("Ouvrir la webcam", url)
+                st.caption("Le flux s’ouvre dans un nouvel onglet sur le site du diffuseur.")
         else:
             st.info("Sélectionnez un repère sur la carte pour afficher son flux vidéo.")
 
@@ -113,12 +166,12 @@ def live_webcams() -> None:
 def webcams() -> None:
     view = st.radio(
         "Contenu webcam",
-        ("Flux YouTube", "Archives enregistrées"),
+        ("Webcams", "Archives enregistrées"),
         horizontal=True,
         label_visibility="collapsed",
         key="webcam_content_view",
     )
-    if view == "Flux YouTube":
+    if view == "Webcams":
         live_webcams()
     else:
         archives()
