@@ -282,6 +282,17 @@ le graphique utilisent ces feux datés, avec des positions approximatives à la 
 ou au département si nécessaire. Les métadonnées d’apprentissage restent sur 2006–2024 ;
 la borne de disponibilité des observations est calculée séparément.
 
+Les boutons **ARCHIVES**, **LIVE** et **PRÉDICTION**, à droite de la timeline,
+permettent aussi d’afficher aujourd’hui et les **sept prochains jours**. Le service
+Docker `weather` collecte la météo modélisée Open-Meteo toutes les **90 minutes**,
+prolonge les indices de sécheresse et applique le modèle existant sans réentraînement.
+Les nouvelles valeurs sont chargées séparément de l’historique ; la carte et son zoom
+restent en place. Une dernière carte complète est conservée en cas de panne.
+Les révisions sont gardées sept jours, puis condensées en une version quotidienne ;
+quelques prévisions sont conservées pour évaluer J+1/J+3/J+7.
+Voir **[LIVE_PREDICTION.md](LIVE_PREDICTION.md)** pour le démarrage, le petit fichier
+initial de sécheresse à partager, les quotas et les limites de cette nouvelle source.
+
 - **Météo** : données climatologiques quotidiennes Météo-France (data.gouv.fr, sans compte) de
   587 stations ayant TX, humidité minimale, vent moyen et pluie au moins 80 % des jours depuis 2005 ;
   un trou est comblé par la station la plus proche. Mise à jour quotidienne (dernier jour : J−2 environ).

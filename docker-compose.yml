@@ -38,12 +38,23 @@ services:
       RISK_DIR: /risk
       FIRE_DATA_PATH: /incendies/Incendies.csv
       BDIFF_DIR: /bdiff
+      WEATHER_PUBLIC_URL: ${WEATHER_PUBLIC_URL:-/app/static/weather/current.json}
     volumes:
       - ./archives-data:/archives:ro,z
       - ${RISK_DATA_DIR:-./risk-data}:/risk:ro,z
       - ./ifm_plus/data/raw/incendies:/incendies:ro,z
       - ./ifm_plus/data/raw/manual/bdiff:/bdiff:ro,z
+      - ${WEATHER_DATA_DIR:-./data/weather}/public:/app/static/weather:ro,z
     depends_on: [api]
+    restart: unless-stopped
+
+  weather:
+    build:
+      context: .
+      dockerfile: weather/Dockerfile
+    volumes:
+      - ${RISK_DATA_DIR:-./risk-data}:/risk:ro,z
+      - ${WEATHER_DATA_DIR:-./data/weather}:/weather:z
     restart: unless-stopped
 
   cam-1:

@@ -7,12 +7,12 @@ const CELL_DETAILS_ZOOM=7;
 let cameraFrame=null;
 let rows=new Map(),bounds=new Map(),deptNumbers=new Map(),statsCache=new Map(),colorsCache=new Map();
 let filterExtension=null,currentColors=null,renderedLayers=[],loadCount=0,daily=null;
-let timeline=null,weatherVersion=null,weatherPending=null;
+let timeline=null,weatherVersion=null,weatherPending=null,historyWeather=null,liveVersion=null,liveUrl=null,livePoll=null,liveBusy=false;
 const indicatorKeys=['s_combustible','s_humain','foret_frac','resineux_frac','wui_frac','route_ponderee_km'];
 let nationalIndicators={},indicatorCache=new Map();
 const UNITS={p_feu:[2,' %/an'],p_jour:[2,' / 10 000']};
 const unit=layer=>UNITS[layer]||[1,' / 100'];
-const layerKey=(layer=state.layer)=>layer==='score'?R.scoreKey(state):layer==='p_jour'?`p_jour|${daily?.key}`:layer;
+const layerKey=(layer=state.layer)=>layer==='score'?R.scoreKey(state):layer==='p_jour'?`p_jour|${daily?.key}|${daily?.revision}`:layer;
 const fmt=(n,d=0)=>Number(n).toLocaleString('fr-FR',{minimumFractionDigits:d,maximumFractionDigits:d});
 const score=f=>dataset.scores[R.scoreKey(state)][f._index]/10;
 const value=f=>state.layer==='p_jour'?daily?.values[f._index]:R.value(f,state,dataset.scores);
@@ -221,7 +221,7 @@ function departmentHTML(dept){
   `${fmt(s.count)} mailles de 2 km<br>`+
   `${e(dataset.layers[state.layer])} : médiane <b>${s.median===null?'Non disponible':fmt(s.median,decimals)+suffix}</b><br>`+
   `Mailles en classe élevée ou plus : <b>${s.high===null?'Non disponible':fmt(s.high*100,1)+' %'}</b><br>`+
-  `<span class="muted">${state.layer==='p_jour'?`Météo observée du ${R.escape(daily.label)} · ${fmt(s.count)} mailles renseignées sur ${fmt(rows.get(dept).length)}.`:'Synthèse des mailles du département, sans météo du jour.'}</span>`;
+  `<span class="muted">${state.layer==='p_jour'?`${daily.kind==='observed'?'Météo des stations':daily.kind==='forecast'?'Météo prévue':'Météo modélisée'} du ${R.escape(daily.label)} · ${fmt(s.count)} mailles renseignées sur ${fmt(rows.get(dept).length)}.`:'Synthèse des mailles du département, sans météo du jour.'}</span>`;
 }
 function updateDepartmentDetails(){
  $('department-details').hidden=!selectedDept;
@@ -249,7 +249,7 @@ function update(kind='layer'){
   const span=document.createElement('span'),swatch=document.createElement('i');swatch.style.background=`rgb(${rgb})`;
   span.append(swatch,document.createTextNode(`${name} (${high?low+'–'+high:'≥ '+low})`));$('legend').append(span);
  }
- $('explanation').textContent=state.layer==='p_jour'?`Risque du ${daily.label}, pour 10 000 : terrain et météo observée. Ronds blancs : feux BDIFF déclarés. Les probabilités communales sont réparties entre les mailles ; ce n’est pas une prévision.`:state.layer==='p_feu'?''
+ $('explanation').textContent=state.layer==='p_jour'?`Risque journalier du ${daily.label}, pour 10 000 : terrain et ${daily.kind==='observed'?'météo des stations Météo-France':daily.kind==='forecast'?'prévisions météo Open-Meteo':'météo modélisée Open-Meteo'}. ${daily.fires.length?'Ronds blancs : feux BDIFF déclarés. ':''}Les probabilités communales sont réparties entre les mailles.${daily.kind==='live'?' Estimation pour toute la journée, révisée toutes les 1 h 30.':daily.kind==='forecast'?' Prévision expérimentale : incertitude croissante avec l’échéance.':''}`:state.layer==='p_feu'?''
   :'Indice de sensibilité du terrain, relatif aux départements calculés ensemble. Végétation, relief et pression humaine ; sans météo, ce score n’est pas une probabilité.';
  updateDepartmentDetails();
  if(kind==='department'){
@@ -281,16 +281,16 @@ function applyDaily(d){
   if(had){renderLayerControls();update('layer');}
   return;
  }
- if(daily&&daily.key===d.key)return;
+ if(daily&&daily.key===d.key&&daily.revision===(d.revision||'history')&&daily.kind===(d.kind||'observed')){if(d.activate){state.layer='p_jour';renderLayerControls();update('layer');}return;}
  const decode=b64=>new Float32Array(Uint8Array.from(atob(b64),c=>c.charCodeAt(0)).buffer);
  const values=typeof d.values==='string'?decode(d.values):d.values;
  const fwi=typeof d.fwi==='string'?decode(d.fwi):d.fwi;
  if(values.length!==dataset.features.length||(fwi&&fwi.length!==values.length))throw new Error('Données météo et maillage incompatibles');
- daily={key:d.key,label:d.label,values,fwi,fires:d.fires||[]};
+ daily={key:d.key,label:d.label,values,fwi,fires:d.fires||[],revision:d.revision||'history',kind:d.kind||'observed'};
  dataset.layers={p_jour:`Risque du jour (${d.label})`,...Object.fromEntries(Object.entries(dataset.layers).filter(([k])=>k!=='p_jour'))};
  dataset.legends.p_jour=d.legend;
  for(const k of [...statsCache.keys()])if(k.includes('p_jour'))statsCache.delete(k);
- if(!had&&!d.keep_layer)state.layer='p_jour';
+ if(d.activate||!had&&!d.keep_layer)state.layer='p_jour';
  document.body.dataset.dailyKey=d.key;
  if(!had)renderLayerControls();
  else {const label=document.querySelector('input[name=layer][value=p_jour]')?.parentElement;if(label)label.lastChild.textContent=dataset.layers.p_jour;}
@@ -360,7 +360,7 @@ async function inflate(payload){
  return new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
 }
 async function installWeather(bundle){
- if(!bundle){weatherPending=null;weatherVersion=null;timeline?.clear();applyDaily(null);return;}
+ if(!bundle){weatherPending=null;weatherVersion=null;historyWeather=null;timeline?.clear();applyDaily(null);return;}
  if(bundle.version===weatherVersion||bundle.version===weatherPending)return;
  weatherPending=bundle.version;
  const start=performance.now();
@@ -372,16 +372,45 @@ async function installWeather(bundle){
  for(const key of [...colorsCache.keys()])if(key.startsWith('p_jour|'))colorsCache.delete(key);
  for(const key of [...statsCache.keys()])if(key.includes('p_jour|'))statsCache.delete(key);
  if(!timeline)timeline=DailyControls({onDay:applyDaily});
- timeline.install(data);weatherVersion=bundle.version;weatherPending=null;
+ historyWeather=data;liveVersion=null;timeline.install(data);weatherVersion=bundle.version;weatherPending=null;
  document.body.dataset.weatherLoads=String(Number(document.body.dataset.weatherLoads||0)+1);
  document.body.dataset.weatherLoadMs=(performance.now()-start).toFixed(2);
  $('status').hidden=true;
+}
+async function pollLive(){
+ if(liveBusy||!liveUrl||!historyWeather||!timeline)return;
+ liveBusy=true;
+ try{
+  const url=new URL(liveUrl,window.location.href),response=await fetch(url,{cache:'no-store',signal:AbortSignal.timeout(20000)});
+  if(!response.ok)throw new Error('Collecteur météo indisponible');
+  const manifest=await response.json();timeline.setStatus(manifest);
+  if(manifest.version&&manifest.version!==liveVersion){
+   if(!/^bundle-[a-f0-9]{64}\.json$/.test(manifest.bundle))throw new Error('Archive météo invalide');
+   const res=await fetch(new URL(manifest.bundle,url),{cache:'no-store',signal:AbortSignal.timeout(20000)});
+   if(!res.ok)throw new Error('Collecte météo en cours de publication');
+   const bundle=await res.json();if(bundle.version!==manifest.version)throw new Error('Collecte météo modifiée, nouvelle tentative au prochain contrôle');
+   const operational=JSON.parse(new TextDecoder().decode(await inflate(bundle.payload)));
+   const merged=DailyLogic.withOperational(historyWeather,operational);
+   liveVersion=manifest.version;
+   // A revision of the same day invalidates its values and colors, but never its camera.
+   daily=null;
+   for(const key of [...colorsCache.keys()])if(key.startsWith('p_jour|'))colorsCache.delete(key);
+   for(const key of [...statsCache.keys()])if(key.includes('p_jour|'))statsCache.delete(key);
+   timeline.install(merged);
+   document.body.dataset.liveVersion=liveVersion;
+  }
+ }catch(error){timeline.setStatus({error:error.message});}
+ finally{liveBusy=false;}
+}
+function connectLive(url){
+ if(url!==liveUrl){clearInterval(livePoll);liveUrl=url;liveVersion=null;livePoll=url?setInterval(pollLive,60000):null;}
+ pollLive();
 }
 let latestArgs=null;
 window.addEventListener('message',async event=>{
  if(event.source!==parent||event.data.type!=='streamlit:render')return;
  const args=event.data.args;latestArgs=args;
- if(args.version===version){try{await installWeather(args.weather);}catch(e){weatherPending=null;fail(e);}return;}
+ if(args.version===version){try{await installWeather(args.weather);connectLive(args.live_url);}catch(e){weatherPending=null;fail(e);}return;}
  if(args.version===pending)return;
  pending=args.version;$('status').hidden=false;$('error').hidden=true;
  try{
@@ -389,7 +418,7 @@ window.addEventListener('message',async event=>{
   if(pending!==args.version)return;
   timeline?.clear();weatherVersion=null;weatherPending=null;
   initialize(data);version=args.version;pending=null;
-  await installWeather(latestArgs.weather);
+  await installWeather(latestArgs.weather);connectLive(latestArgs.live_url);
  }catch(e){pending=null;weatherPending=null;fail(e);}
 });
 new ResizeObserver(()=>send('streamlit:setFrameHeight',{height:document.body.scrollHeight+8})).observe(document.body);
