@@ -17,11 +17,18 @@ function viewBounds(b){
  return new deck.WebMercatorViewport({width,height}).fitBounds([[b[0],b[1]],[b[2],b[3]]],{padding:40,maxZoom:12});
 }
 function setView(next){
+ const zoomChanged=view?.zoom!==next.zoom;
  view=next;
  document.body.dataset.view=JSON.stringify(view);
  // Keep the camera controlled: reapplying initialViewState is ignored when its
  // values match the previous reset, even after the user has panned or zoomed.
- if(map)map.setProps({viewState:view});
+ if(map){
+  // Only the 96 outlines change with zoom; retain the national risk layer.
+  if(zoomChanged&&renderedLayers.length){
+   renderedLayers=renderedLayers.map(current=>current.id==='department-outlines'?departmentLayers(true):current);
+   map.setProps({viewState:view,layers:renderedLayers});
+  }else map.setProps({viewState:view});
+ }
 }
 function fit(){
  if(!dataset||!map)return;
@@ -58,17 +65,20 @@ function layer(colorKey){
  const n=deptNumbers.get(state.dept),range=state.dept==='all'?[-1,999]:[n,n];
  return new deck.GeoJsonLayer({id:'national-risk',data:dataset.features,pickable:true,
   filled:true,stroked:true,getFillColor:getColor,getLineColor:[255,255,255,60],lineWidthMinPixels:.3,
-  opacity:Math.pow(.7,2.2),autoHighlight:true,highlightColor:[33,110,85,200],
+  opacity:1,autoHighlight:true,highlightColor:[33,110,85,200],
   extensions:[filterExtension],getFilterValue:getFilter,filterRange:range,
   updateTriggers:{getFillColor:colorKey}});
 }
 function departmentLayers(outline=false){
+ // Fade national boundaries progressively; keep the selected department distinct.
+ const detail=Math.max(0,Math.min(1,((view?.zoom??5.5)-5.5)/3.5));
+ const alpha=Math.round(55+135*detail),width=.45+.55*detail;
  return new deck.GeoJsonLayer({id:outline?'department-outlines':'department-picking',
   data:dataset.department_boundaries.features,pickable:!outline,
   filled:!outline,stroked:outline,getFillColor:[0,0,0,0],
-  getLineColor:f=>f.properties.code===selectedDept?[210,35,35,255]:[45,64,79,190],
-  getLineWidth:f=>f.properties.code===selectedDept?3:1,lineWidthUnits:'pixels',
-  parameters:{depthTest:false},updateTriggers:{getLineColor:selectedDept,getLineWidth:selectedDept}});
+  getLineColor:f=>f.properties.code===selectedDept?[210,35,35,255]:[45,64,79,alpha],
+  getLineWidth:f=>f.properties.code===selectedDept?3:width,lineWidthUnits:'pixels',
+  parameters:{depthTest:false},updateTriggers:{getLineColor:[selectedDept,alpha],getLineWidth:[selectedDept,width]}});
 }
 function departmentHighlightLayer(){
  return new deck.GeoJsonLayer({id:'department-highlights',
