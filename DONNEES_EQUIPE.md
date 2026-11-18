@@ -11,8 +11,8 @@ Le paquet du 17 novembre 2026 pèse **77,1 Mo** et occupe **142 Mo** une fois ex
 Depuis la racine du dépôt, avec Docker et Compose installés :
 
 ```bash
-git switch manon
-git pull --ff-only origin manon
+git switch main
+git pull --ff-only origin main
 sha256sum -c pyro-watch-risque-france.tar.gz.sha256
 tar -xzf pyro-watch-risque-france.tar.gz
 docker compose up --build -d api dashboard
@@ -68,8 +68,8 @@ Prérequis : le dépôt cloné, Docker avec Compose, et le fichier
 Placez l’archive **à la racine du dépôt** (à côté de `docker-compose.yml`), puis lancez :
 
 ```bash
-git switch manon
-git pull --ff-only origin manon
+git switch main
+git pull --ff-only origin main
 tar -xzf pyro-watch-images.tar.gz
 docker compose up --build -d api dashboard
 ```
