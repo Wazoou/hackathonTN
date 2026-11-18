@@ -371,7 +371,11 @@ async function installWeather(bundle){
  daily=null;
  for(const key of [...colorsCache.keys()])if(key.startsWith('p_jour|'))colorsCache.delete(key);
  for(const key of [...statsCache.keys()])if(key.includes('p_jour|'))statsCache.delete(key);
- if(!timeline)timeline=DailyControls({onDay:applyDaily});
+ if(!timeline)timeline=DailyControls({onDay:applyDaily,onLoading:loading=>{
+  $('map').setAttribute('aria-busy',String(loading));
+  $('map-loading').setAttribute('aria-hidden',String(!loading));
+  document.body.dataset.modeLoading=String(loading);
+ }});
  historyWeather=data;liveVersion=null;timeline.install(data);weatherVersion=bundle.version;weatherPending=null;
  document.body.dataset.weatherLoads=String(Number(document.body.dataset.weatherLoads||0)+1);
  document.body.dataset.weatherLoadMs=(performance.now()-start).toFixed(2);

@@ -1,8 +1,14 @@
 /* Calendar, slider, observed fires and comparison chart stay entirely in this iframe. */
-function DailyControls({onDay}){
+function DailyControls({onDay,onLoading=()=>{}}){
  const el=id=>document.getElementById(id),format=key=>key.split('-').reverse().join('/');
  const number=n=>n.toLocaleString('fr-FR',{minimumFractionDigits:1,maximumFractionDigits:1});
  let data=null,index=0,requested=0,frame=null,chartTimer=null,cache=new Map(),mode='archives',available=[],manifest=null,activate=false,displayedToday=null;
+ let switching=false,settleFrame=null,loadingVersion=0;
+ function stopLoading(){
+  if(settleFrame!==null)cancelAnimationFrame(settleFrame);settleFrame=null;
+  loadingVersion++;
+  if(switching){switching=false;onLoading(false);}
+ }
  function today(){return new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());}
  function ranges(which){return data.dates.map((key,i)=>({key,i})).filter(({key})=>which==='live'?key===today():which==='forecast'?key>today():key<today()).map(row=>row.i);}
  function configure(previous){
@@ -25,7 +31,8 @@ function DailyControls({onDay}){
   labels();
  }
  function selectMode(next){
-  if(!data||!ranges(next).length)return;
+  if(!data||next===mode||!ranges(next).length)return;
+  switching=true;onLoading(true);
   mode=next;activate=true;try{sessionStorage.setItem('risk-weather-mode',mode);}catch{}
   let previous;try{previous=sessionStorage.getItem('risk-weather-date-'+mode);}catch{}
   configure(previous);choose(index);
@@ -46,10 +53,14 @@ function DailyControls({onDay}){
  function choose(next){
   if(!data)return;
   if(!available.includes(next))return;requested=next;labels();
-  if(frame===null)frame=requestAnimationFrame(render);
+  if(switching){loadingVersion++;if(settleFrame!==null)cancelAnimationFrame(settleFrame);settleFrame=null;}
+  // Paint the veil before the synchronous calculation, without adding a timer.
+  if(frame===null)frame=requestAnimationFrame(switching?()=>{frame=requestAnimationFrame(render);}:render);
  }
  function render(){
   frame=null;index=requested;const start=performance.now();
+  const currentLoading=loadingVersion;
+  try{
   if(!cache.has(index)){
    if(cache.size>=12)cache.delete(cache.keys().next().value);
    cache.set(index,DailyLogic.computeDay(data,index));
@@ -63,6 +74,12 @@ function DailyControls({onDay}){
   document.body.dataset.dailyComputeMs=(performance.now()-start).toFixed(2);
   document.body.dataset.dailyUpdates=String(Number(document.body.dataset.dailyUpdates||0)+1);
   clearTimeout(chartTimer);chartTimer=setTimeout(chart,120);
+  }finally{
+   // Keep the cue through the GPU redraw; a newer selection owns its own completion.
+   if(switching)settleFrame=requestAnimationFrame(()=>{settleFrame=requestAnimationFrame(()=>{
+    settleFrame=null;if(currentLoading===loadingVersion)stopLoading();
+   });});
+  }
  }
  function chart(){
   if(!data||!el('daily-series').open)return;
@@ -100,6 +117,7 @@ function DailyControls({onDay}){
  el('daily-series').ontoggle=chart;
  return {
   install(model){
+   stopLoading();
    if(frame!==null)cancelAnimationFrame(frame);frame=null;clearTimeout(chartTimer);data=model;cache.clear();
    let previous;try{mode=sessionStorage.getItem('risk-weather-mode')||mode;previous=sessionStorage.getItem('risk-weather-date-'+mode)||sessionStorage.getItem('risk-weather-date');}catch{}
    if(!['archives','live','forecast'].includes(mode))mode='archives';
@@ -108,6 +126,6 @@ function DailyControls({onDay}){
    labels();render();
   },
   setStatus(value){manifest=value?{...manifest,...value}:null;status();if(data&&displayedToday!==today()){configure(data.dates[index]);choose(index);}},
-  clear(){if(frame!==null)cancelAnimationFrame(frame);frame=null;clearTimeout(chartTimer);data=null;cache.clear();el('time-controls').hidden=true;el('daily-series').hidden=true;}
+  clear(){stopLoading();if(frame!==null)cancelAnimationFrame(frame);frame=null;clearTimeout(chartTimer);data=null;cache.clear();el('time-controls').hidden=true;el('daily-series').hidden=true;}
  };
 }
