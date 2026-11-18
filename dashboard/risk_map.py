@@ -6,6 +6,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 from risk_payload import build_payload, file_signature
+from fire_statistics import history_signature
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 BDIFF_RISK_DIR = PROJECT_ROOT / 'pyro-watch-risque-france-bdiff' / 'risk-data'
@@ -16,13 +17,14 @@ DEFAULT_RISK_DIR = (
     else LEGACY_RISK_DIR
 )
 RISK_DIR = Path(os.getenv('RISK_DIR', str(DEFAULT_RISK_DIR)))
+BDIFF_DIR = Path(os.getenv('BDIFF_DIR', str(PROJECT_ROOT / 'ifm_plus/data/raw/manual/bdiff')))
 _component = components.declare_component('national_risk_map', path=str(Path(__file__).parent / 'risk_component'))
 
 
 @st.cache_resource(max_entries=2, show_spinner=False)
-def cached_payload(signature):
+def cached_payload(signature, fire_signature=()):
     # Immutable encoded payload. Unlike cache_data, no deep copy of 140k polygons per rerun.
-    return build_payload(signature)
+    return build_payload(signature, fire_signature)
 
 
 def risk_map():
@@ -31,5 +33,5 @@ def risk_map():
         st.info('Aucune carte de risque disponible. Générez les fichiers dans risk-data avec ml/build_static_risk.py.')
         return
     with st.spinner('Préparation de la carte nationale…'):
-        payload = cached_payload(signature)
+        payload = cached_payload(signature, history_signature(BDIFF_DIR))
     _component(payload=payload['payload'], version=payload['version'], key='national_risk_map', default=None)

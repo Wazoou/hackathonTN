@@ -13,9 +13,9 @@ function scoreKey(state){return state.mode==='multiplicatif'?'multiplicatif':`ad
 function value(feature,state,scores){return state.layer==='score'?scores[scoreKey(state)][feature._index]/10:feature.properties[state.layer];}
 function summary(features,state,scores){
  const n=features.length,values=new Float64Array(n),top=[];
- let high=0;
+ let high=0,total=0;
  for(let i=0;i<n;i++){
-  const f=features[i],v=value(f,state,scores);values[i]=v;
+  const f=features[i],v=value(f,state,scores);values[i]=v;total+=v;
   if(scale(v,state.layer)>=60)high++;
   // Keep only the best 15 instead of sorting every feature a second time.
   if(top.length<15||v>top[top.length-1].v){
@@ -25,7 +25,7 @@ function summary(features,state,scores){
  }
  values.sort(); // Native numeric sort, without a JS comparator for every pair.
  const median=n?(values[Math.floor((n-1)/2)]+values[Math.floor(n/2)])/2:0;
- return {count:n,median,high:n?high/n:0,top:top.map(t=>t.f)};
+ return {count:n,mean:n?total/n:null,median,high:n?high/n:0,top:top.map(t=>t.f)};
 }
 function escape(value){return String(value??'—').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 const api={scale,riskClass,scoreKey,value,summary,escape};

@@ -3,6 +3,8 @@ const $=id=>document.getElementById(id), R=RiskLogic;
 const send=(type,extra={})=>parent.postMessage({isStreamlitMessage:true,type,...extra},'*');
 const state={dept:'all',layer:'score',mode:'multiplicatif',weight:12};
 let dataset=null,map=null,version=null,pending=null,frame=null,view=null,selectedDept=null,hoveredDept=null;
+const CELL_DETAILS_ZOOM=7;
+let cameraFrame=null;
 let rows=new Map(),bounds=new Map(),deptNumbers=new Map(),statsCache=new Map(),colorsCache=new Map();
 let filterExtension=null,currentColors=null,renderedLayers=[],loadCount=0;
 const indicatorKeys=['s_combustible','s_humain','foret_frac','resineux_frac','wui_frac','route_ponderee_km'];
@@ -20,6 +22,7 @@ function setView(next){
  const zoomChanged=view?.zoom!==next.zoom;
  view=next;
  document.body.dataset.view=JSON.stringify(view);
+ document.body.dataset.detailMode=view.zoom>=CELL_DETAILS_ZOOM?'cells':'departments';
  // Keep the camera controlled: reapplying initialViewState is ignored when its
  // values match the previous reset, even after the user has panned or zoomed.
  if(map){
@@ -30,10 +33,57 @@ function setView(next){
   }else map.setProps({viewState:view});
  }
 }
-function fit(){
+function cancelCameraAnimation(){
+ if(cameraFrame!==null)cancelAnimationFrame(cameraFrame);
+ cameraFrame=null;
+}
+function animateView(target){
+ cancelCameraAnimation();
+ if(!view||window.matchMedia('(prefers-reduced-motion: reduce)').matches){setView(target);return;}
+ const start={...view},started=performance.now(),duration=800;
+ const tick=now=>{
+  const progress=Math.min(1,(now-started)/duration);
+  const eased=progress<.5?4*progress**3:1-(-2*progress+2)**3/2;
+  const next={...target};
+  for(const key of ['longitude','latitude','zoom','pitch','bearing']){
+   next[key]=(start[key]??0)+((target[key]??0)-(start[key]??0))*eased;
+  }
+  setView(next);
+  cameraFrame=progress<1?requestAnimationFrame(tick):null;
+ };
+ cameraFrame=requestAnimationFrame(tick);
+}
+function fit(dept=state.dept){
  if(!dataset||!map)return;
- const b=bounds.get(state.dept),v=viewBounds(b);
- setView({longitude:v.longitude,latitude:v.latitude,zoom:v.zoom,pitch:0,bearing:0});
+ const b=bounds.get(dept),v=viewBounds(b);
+ animateView({longitude:v.longitude,latitude:v.latitude,zoom:v.zoom,pitch:0,bearing:0});
+}
+function manualView(next){cancelCameraAnimation();setView(next);}
+function hoveredDepartment(object){
+ return object?(object.properties.dept||object.properties.code||null):null;
+}
+function tooltipFor({object}){
+ const dept=hoveredDepartment(object);
+ if(!dept)return null;
+ const html=view?.zoom>=CELL_DETAILS_ZOOM&&!object.properties.code?featureHTML(object)
+  :departmentTooltipHTML(dept);
+ return {html,style:{backgroundColor:'white',color:'#253747',fontSize:'12px',maxWidth:'360px'}};
+}
+function departmentTooltipHTML(dept){
+ const history=dataset.fire_history,years=history?.years||[];
+ const observed=history?.departments[dept];
+ const annual=years.length?`${fmt(observed?.annual_mean??0,1)} départs de feu par an en moyenne`:'Historique BDIFF indisponible';
+ const period=history?.complete?'2006–2024':years.join(', ');
+ const riskLayer=dataset.layers.p_feu?'p_feu':'score',s=stats(dept,riskLayer);
+ return `<strong>${R.escape(dataset.department_names[dept]||dept)} (${R.escape(dept)})</strong><br>`+
+  `<b>${annual}</b><br>`+
+  (years.length?`<span style="font-size:11px">Historique BDIFF ${R.escape(period)}${history.complete?'':' · couverture partielle'}</span><br>`:'')+
+  `<b>${fmt(s.high*100,1)} % des mailles</b> à risque élevé ou très élevé<br>`+
+  `<span style="font-size:11px">${riskLayer==='p_feu'?'Modèle BDIFF · sans météo du jour':'Score expert · sans météo du jour'}</span>`;
+}
+function hoverMap({object}){
+ const dept=hoveredDepartment(object);
+ if(dept!==hoveredDept){hoveredDept=dept;updateDepartmentHighlight();}
 }
 function featureHTML(f){
  const p=f.properties, v=value(f), e=R.escape;
@@ -96,11 +146,12 @@ function renderLayers(){
  renderedLayers=[departmentLayers(),layer(colors()),departmentHighlightLayer(),departmentLayers(true)];
  map.setProps({layers:renderedLayers});
 }
-function stats(dept=state.dept){
- const key=`${dept}|${state.layer}|${state.layer==='score'?R.scoreKey(state):''}`;
+function stats(dept=state.dept,layer=state.layer){
+ const selection={...state,layer};
+ const key=`${dept}|${layer}|${layer==='score'?R.scoreKey(selection):''}`;
  if(!statsCache.has(key)){
   if(statsCache.size>=64)statsCache.delete(statsCache.keys().next().value);
-  statsCache.set(key,R.summary(rows.get(dept),state,dataset.scores));
+  statsCache.set(key,R.summary(rows.get(dept),selection,dataset.scores));
  }
  return statsCache.get(key);
 }
@@ -161,7 +212,9 @@ function updateDepartmentDetails(){
 }
 function selectDepartment(dept){
  if(!rows.has(dept))return;
+ const alreadyDetailed=selectedDept===dept&&view?.zoom>=CELL_DETAILS_ZOOM;
  selectedDept=dept;updateDepartmentDetails();renderLayers();
+ if(!alreadyDetailed)fit(dept);
 }
 function controls(){
  $('modes').disabled=state.layer!=='score';$('weight').disabled=state.layer!=='score'||state.mode!=='additif';
@@ -170,7 +223,9 @@ function controls(){
 function update(kind='layer'){
  if(!dataset||!map)return;
  const start=performance.now();
- if(kind==='department')selectedDept=state.dept==='all'?null:state.dept;
+ if(kind==='department'){
+  selectedDept=state.dept==='all'?null:state.dept;
+ }
  renderLayers();controls();
  $('legend').replaceChildren();
  for(const [name,low,high,rgb] of dataset.legends[state.layer]){
@@ -194,6 +249,7 @@ function schedule(kind){scheduledKind=kind;if(frame)return;frame=requestAnimatio
 function initialize(data){
  dataset=data;rows=new Map([['all',data.features]]);bounds=new Map();deptNumbers=new Map();statsCache.clear();colorsCache.clear();
  nationalIndicators=meanIndicators(data.features);indicatorCache.clear();
+ cancelCameraAnimation();
  selectedDept=null;hoveredDept=null;renderedLayers=[];
  data.departments.forEach((d,i)=>{deptNumbers.set(d,i);rows.set(d,[]);});
  data.features.forEach((f,i)=>{
@@ -233,13 +289,9 @@ function initialize(data){
    attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'}},
   layers:[{id:'openstreetmap-raster',type:'raster',source:'openstreetmap'}]},
   viewState:view,controller:true,
-  onViewStateChange:({viewState})=>setView(viewState),
-  getTooltip:({object})=>object?{html:object.properties.code?departmentHTML(object.properties.code):featureHTML(object),style:{backgroundColor:'white',color:'#253747',fontSize:'12px',maxWidth:'360px'}}:null,
-  onHover:({object})=>{
-   const properties=object&&object.properties;
-   const dept=properties&&(properties.code||properties.dept)||null;
-   if(dept!==hoveredDept){hoveredDept=dept;updateDepartmentHighlight();}
-  },
+  onViewStateChange:({viewState})=>manualView(viewState),
+  getTooltip:tooltipFor,
+  onHover:hoverMap,
   onClick:({object})=>{if(object){
    selectDepartment(object.properties.dept||object.properties.code);
   }},
@@ -249,8 +301,10 @@ function initialize(data){
 $('department').onchange=()=>{state.dept=$('department').value;update('department');};
 $('explore-department').onclick=()=>{if(selectedDept){state.dept=selectedDept;$('department').value=state.dept;update('department');}};
 $('weight').oninput=()=>{state.weight=Number($('weight').value);schedule('weight');};
-$('fit').onclick=fit;
-for(const [id,delta] of [['zoom-in',1],['zoom-out',-1]])$(id).onclick=()=>{if(map)setView({...view,zoom:Math.max(0,Math.min(18,view.zoom+delta))});};
+$('fit').onclick=()=>fit();
+// Direct manipulation interrupts the flight immediately.
+for(const event of ['pointerdown','wheel'])$('map').addEventListener(event,cancelCameraAnimation,{passive:true});
+for(const [id,delta] of [['zoom-in',1],['zoom-out',-1]])$(id).onclick=()=>{if(map)animateView({...view,zoom:Math.max(0,Math.min(18,view.zoom+delta))});};
 $('fullscreen').onclick=async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await $('map').requestFullscreen();}catch(e){fail(e);}};
 window.addEventListener('message',async event=>{
  if(event.source!==parent||event.data.type!=='streamlit:render')return;

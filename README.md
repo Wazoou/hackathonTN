@@ -28,10 +28,20 @@ La navigation permet de passer entre **Carte des risques**, **Webcam**,
 **Alerte simulée** et **Historique des incendies**. La carte des risques conserve
 le maillage national, les scores experts et la régression BDIFF,
 avec les réglages interactifs sans rechargement des données.
-Les contours des 96 départements restent visibles au-dessus des mailles. Un clic
-affiche une fiche départementale (effectif, médiane de la couche active et part de
-mailles en classe élevée ou plus), avec un bouton **Explorer ce département**.
-Les détails de la maille cliquée restent accessibles. Les contours IGN sont fournis
+Les contours des 96 départements restent visibles au-dessus des mailles. Le survol
+affiche le nom et le numéro du département en vue éloignée, la moyenne annuelle
+des départs de feu recensés par BDIFF sur 2006–2024, puis la proportion de mailles
+classées à risque élevé ou très élevé par le modèle BDIFF (score expert en secours).
+La moyenne historique inclut les années sans feu et déduplique les exports qui se
+recouvrent ; elle ne dépend ni des coordonnées ni de la surface brûlée renseignées.
+Si les fichiers sont absents ou la période incomplète, l’infobulle le signale. Un clic zoome en douceur
+sur ce département (animation de 800 ms), tout en affichant sa fiche à droite
+(effectif, médiane de la couche active et part de mailles en classe élevée ou plus).
+Les détails des mailles apparaissent dès le niveau de zoom 7, quel que soit le
+département survolé ; dézoomer sous ce seuil revient à la synthèse départementale. La fiche reste
+affichée. Un déplacement manuel interrompt l’animation ; la préférence système
+de réduction des animations est respectée.
+Le bouton **Explorer ce département** reste disponible. Les contours IGN sont fournis
 avec le code et simplifiés à 50 m uniquement pour l’affichage ; les géométries du
 maillage et les calculs ne sont pas modifiés. Leur export peut être régénéré depuis
 le cache IGN avec `ifm_plus/.venv/bin/python ml/build_department_boundaries.py`.

@@ -15,8 +15,12 @@ const state={layer:'score',mode:'multiplicatif',weight:12};
 const actual=R.summary(features,state,scores);
 const expected=features.slice().sort((a,b)=>b.properties.s_combustible-a.properties.s_combustible||a._index-b._index).slice(0,15);
 assert.equal(JSON.stringify(actual.top.map(f=>f._index)),JSON.stringify(expected.map(f=>f._index)));
-assert.equal(actual.median,30);assert.equal(actual.high,.25);
+assert.equal(actual.mean,30);assert.equal(actual.median,30);assert.equal(actual.high,.25);
 assert.equal(R.summary([],state,scores).count,0);
+assert.equal(R.summary([],state,scores).mean,null);
+const unequal=[1,2,9].map((v,i)=>({_index:i,properties:{p_feu:v}}));
+assert.equal(R.summary(unequal,{layer:"p_feu"},{}).mean,4);
+assert.equal(R.summary(unequal,{layer:"p_feu"},{}).median,2);
 if(process.argv[2]){
  const data=JSON.parse(zlib.gunzipSync(fs.readFileSync(process.argv[2])));
  const reference=JSON.parse(fs.readFileSync(process.argv[3]));

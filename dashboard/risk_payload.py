@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 from risk_data import CLASSES, LAYERS, combine, color, class_ranges, to_scale
+from fire_statistics import department_fire_statistics
 
 
 def file_signature(folder):
@@ -15,7 +16,7 @@ def file_signature(folder):
                  for p in files)
 
 
-def build_payload(signature):
+def build_payload(signature, history_signature=()):
     features, metadata, departments = [], {}, []
     for filename, *_ in signature:
         path = Path(filename)
@@ -41,6 +42,7 @@ def build_payload(signature):
     boundaries = json.loads((Path(__file__).parent / 'risk_component/department_boundaries.geojson').read_text())
     boundaries['features'] = [f for f in boundaries['features'] if f['properties']['code'] in departments]
     data = {'features': features, 'scores': scores, 'departments': departments,
+            'fire_history': department_fire_statistics(history_signature),
             'department_boundaries': boundaries,
             'department_names': json.loads((Path(__file__).parent / 'risk_component/departments.json').read_text()),
             'metadata': metadata, 'layers': layers,
