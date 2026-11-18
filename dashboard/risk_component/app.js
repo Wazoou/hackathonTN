@@ -64,11 +64,25 @@ function departmentLayers(outline=false){
  return new deck.GeoJsonLayer({id:outline?'department-outlines':'department-picking',
   data:dataset.department_boundaries.features,pickable:!outline,
   filled:!outline,stroked:outline,getFillColor:[0,0,0,0],
-  getLineColor:f=>f.properties.code===selectedDept?[20,83,64,255]:[45,64,79,190],
+  getLineColor:f=>f.properties.code===selectedDept?[35,90,140,255]:[45,64,79,190],
   getLineWidth:f=>f.properties.code===selectedDept?3:1,lineWidthUnits:'pixels',
   parameters:{depthTest:false},updateTriggers:{getLineColor:selectedDept,getLineWidth:selectedDept}});
 }
-function renderLayers(){map.setProps({layers:[departmentLayers(),layer(colors()),departmentLayers(true)]});}
+function selectedDepartmentLayer(){
+ if(!selectedDept)return null;
+ const feature=dataset.department_boundaries.features.find(
+  item=>item.properties.code===selectedDept);
+ if(!feature)return null;
+ return new deck.GeoJsonLayer({id:'selected-department-fill',data:[feature],
+  pickable:false,filled:true,stroked:false,getFillColor:[125,169,201,36],
+  parameters:{depthTest:false}});
+}
+function renderLayers(){
+ const layers=[departmentLayers(),layer(colors())],selectedLayer=selectedDepartmentLayer();
+ if(selectedLayer)layers.push(selectedLayer);
+ layers.push(departmentLayers(true));
+ map.setProps({layers});
+}
 function stats(dept=state.dept){
  const key=`${dept}|${state.layer}|${state.layer==='score'?R.scoreKey(state):''}`;
  if(!statsCache.has(key)){
@@ -93,27 +107,6 @@ function selectDepartment(dept){
  if(!rows.has(dept))return;
  selectedDept=dept;updateDepartmentDetails();renderLayers();
 }
-function updateRanking(s){
- $('value-title').textContent=dataset.layers[state.layer];
- const proba=!!dataset.layers.p_feu&&state.layer!=='p_feu';$('probability-title').hidden=!proba;
- $('top').replaceChildren();
- for(const f of s.top){
-  const p=f.properties,tr=document.createElement('tr');
-  for(const [i,text] of [p.id,p.commune,p.dept,fmt(value(f),state.layer==='p_feu'?2:1),fmt(score(f),1),fmt(p.s_combustible,1),fmt(p.s_humain,1),...(proba?[fmt(p.p_feu,2)]:[])].entries()){
-   const td=document.createElement('td');
-   if(i===0){const button=document.createElement('button');button.textContent=text;button.onclick=()=>{selected=f;$('selected').innerHTML=featureHTML(f);};td.append(button);}
-   else td.textContent=text;tr.append(td);
-  }
-  $('top').append(tr);
- }
-}
-function updateMetadata(){
- const m=dataset.metadata[state.dept==='all'?dataset.departments[0]:state.dept]||{};
- const meta=state.dept==='all'?{...m,departement:'ensemble affiché',carreaux:dataset.features.length}:m;
- $('metadata').textContent=JSON.stringify(meta,null,2);
- $('exclusions').textContent=(m.indicateurs_exclus||[]).includes('tmja_max')?
-  'Le trafic mesuré est exclu du score national faute de couverture suffisante. Les poids de pression humaine sont renormalisés sur l’habitat, les routes et l’agriculture.':'';
-}
 function controls(){
  $('modes').disabled=state.layer!=='score';$('weight').disabled=state.layer!=='score'||state.mode!=='additif';
  $('weight-value').textContent=`${state.weight*5} %`;$('opacity-value').textContent=`${Math.round(state.opacity*100)} %`;
@@ -123,24 +116,21 @@ function update(kind='layer'){
  const start=performance.now();
  if(kind==='department')selectedDept=state.dept==='all'?null:state.dept;
  renderLayers();controls();
- // Opacity only updates a GPU uniform: no sort, statistics, ranking or Python rerun.
+ // Opacity only updates a GPU uniform: no sort, statistics or Python rerun.
  if(kind!=='opacity'){
-  const s=stats();$('count').textContent=fmt(s.count);$('median').textContent=fmt(s.median,state.layer==='p_feu'?1:0)+(state.layer==='p_feu'?' %':'');$('high').textContent=fmt(s.high*100,1)+' %';
   $('legend').replaceChildren();
   for(const [name,low,high,rgb] of dataset.legends[state.layer]){
    const span=document.createElement('span'),swatch=document.createElement('i');swatch.style.background=`rgb(${rgb})`;
    span.append(swatch,document.createTextNode(`${name} (${high?low+'–'+high:'≥ '+low})`));$('legend').append(span);
   }
-  $('explanation').textContent=state.layer==='p_feu'?
-   'Estimation annuelle BDIFF issue d’un modèle appris à l’échelle des communes, puis extrapolé aux mailles. Sans météo, elle ne décrit pas le risque d’un jour donné.':
-   'Indice de sensibilité du terrain, relatif aux départements calculés ensemble. Végétation, relief et pression humaine ; sans météo, ce score n’est pas une probabilité.';
-  if($('ranking').open)updateRanking(s);
+  $('explanation').textContent=state.layer==='p_feu'?''
+   :'Indice de sensibilité du terrain, relatif aux départements calculés ensemble. Végétation, relief et pression humaine ; sans météo, ce score n’est pas une probabilité.';
   if(selected)$('selected').innerHTML=featureHTML(selected);
   updateDepartmentDetails();
  }
  if(kind==='department'){
   selected=null;$('selected').textContent='Survolez une maille pour ses indicateurs, ou cliquez pour conserver sa fiche.';
-  updateMetadata();fit();
+  fit();
  }
  document.body.dataset.updateMs=(performance.now()-start).toFixed(2);
  document.body.dataset.lastAction=kind;
@@ -179,13 +169,17 @@ function initialize(data){
  }
  $('layers').disabled=false;$('opacity').disabled=false;$('opacity').value=Math.round(state.opacity*100);$('weight').value=state.weight;
  document.querySelectorAll('input[name=mode]').forEach(el=>{el.checked=el.value===state.mode;el.onchange=()=>{state.mode=el.value;update('mode');};});
- $('coverage').textContent=`${data.departments.length} départements · ${fmt(data.features.length)} mailles de 2 km · même référence pour tous les scores`;
  filterExtension=new deck.DataFilterExtension({filterSize:1});
  const initial=viewBounds(bounds.get(state.dept));
  view={longitude:initial.longitude,latitude:initial.latitude,zoom:initial.zoom,pitch:0,bearing:0};
  document.body.dataset.view=JSON.stringify(view);
  if(map)map.finalize();
- map=new deck.DeckGL({container:'map',map:maplibregl,mapStyle:'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
+ map=new deck.DeckGL({container:'map',map:maplibregl,mapStyle:{
+  version:8,
+  sources:{openstreetmap:{type:'raster',
+   tiles:['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],tileSize:256,
+   attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'}},
+  layers:[{id:'openstreetmap-raster',type:'raster',source:'openstreetmap'}]},
   viewState:view,controller:true,
   onViewStateChange:({viewState})=>setView(viewState),
   getTooltip:({object})=>object?{html:object.properties.code?departmentHTML(object.properties.code):featureHTML(object),style:{backgroundColor:'white',color:'#253747',fontSize:'12px',maxWidth:'360px'}}:null,
@@ -195,7 +189,7 @@ function initialize(data){
    $('selected').innerHTML=selected?featureHTML(selected):'Survolez une maille pour ses indicateurs, ou cliquez pour conserver sa fiche.';
   }},
   onError:fail});
- updateMetadata();update();$('status').hidden=true;document.body.dataset.ready='true';document.body.dataset.loadCount=String(++loadCount);
+ update();$('status').hidden=true;document.body.dataset.ready='true';document.body.dataset.loadCount=String(++loadCount);
 }
 $('department').onchange=()=>{state.dept=$('department').value;update('department');};
 $('explore-department').onclick=()=>{if(selectedDept){state.dept=selectedDept;$('department').value=state.dept;update('department');}};
@@ -204,7 +198,6 @@ $('weight').oninput=()=>{state.weight=Number($('weight').value);schedule('weight
 $('fit').onclick=fit;
 for(const [id,delta] of [['zoom-in',1],['zoom-out',-1]])$(id).onclick=()=>{if(map)setView({...view,zoom:Math.max(0,Math.min(18,view.zoom+delta))});};
 $('fullscreen').onclick=async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await $('map').requestFullscreen();}catch(e){fail(e);}};
-$('ranking').ontoggle=()=>{if(dataset&&$('ranking').open)updateRanking(stats());};
 window.addEventListener('message',async event=>{
  if(event.source!==parent||event.data.type!=='streamlit:render')return;
  const args=event.data.args;if(args.version===version||args.version===pending)return;

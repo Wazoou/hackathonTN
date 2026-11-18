@@ -7,7 +7,15 @@ import streamlit.components.v1 as components
 
 from risk_payload import build_payload, file_signature
 
-RISK_DIR = Path(os.getenv('RISK_DIR', 'risk-data'))
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+BDIFF_RISK_DIR = PROJECT_ROOT / 'pyro-watch-risque-france-bdiff' / 'risk-data'
+LEGACY_RISK_DIR = PROJECT_ROOT / 'risk-data'
+DEFAULT_RISK_DIR = (
+    BDIFF_RISK_DIR
+    if any(BDIFF_RISK_DIR.glob('risque_statique_*.geojson'))
+    else LEGACY_RISK_DIR
+)
+RISK_DIR = Path(os.getenv('RISK_DIR', str(DEFAULT_RISK_DIR)))
 _component = components.declare_component('national_risk_map', path=str(Path(__file__).parent / 'risk_component'))
 
 
@@ -18,7 +26,6 @@ def cached_payload(signature):
 
 
 def risk_map():
-    st.markdown('<p class="eyebrow">Prévention · sensibilité du terrain</p>', unsafe_allow_html=True)
     st.subheader('Carte de risque de départ de feu')
     signature = file_signature(RISK_DIR)
     if not signature:

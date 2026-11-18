@@ -7,9 +7,14 @@ Voir **[ROADMAP.md](ROADMAP.md)** pour l’état du projet et les prochaines ét
 Pour retrouver exactement les données de la présentation sur une autre machine,
 suivre **[DONNEES_EQUIPE.md](DONNEES_EQUIPE.md)** avec l’archive partagée par le groupe.
 
-## Archives françaises et timeline
+## Carte des risques, archives françaises et timeline
 
-Le dashboard s'ouvre sur **Carte des archives** : Pyro-SDIS et les webcams partagent
+Le dashboard s'ouvre sur **Carte des risques**. La couche BDIFF utilise les données
+locales de `pyro-watch-risque-france-bdiff/risk-data` (96 départements et environ
+140 000 mailles, modèle appris sur les incendies BDIFF 2006–2024). Dans Docker, ce dossier
+est monté en lecture seule ; en lancement local, il est détecté automatiquement.
+La variable `RISK_DIR` permet de choisir un autre dossier de données.
+Le bouton **Webcam** ouvre les archives : Pyro-SDIS et les webcams partagent
 une carte, une timeline et un lecteur. Les deux manifestes locaux restent indépendants ;
 leur index commun conserve les chemins d’images, dates, sources, splits et annotations.
 Les identifiants sont préfixés par la source pour éviter les collisions.
@@ -21,7 +26,7 @@ Le filtre facultatif **Toutes les sources / Pyro-SDIS / Webcams** se trouve dans
 disponibles pour Pyro-SDIS ; les webcams sont non annotées et YOLO reste à connecter.
 La navigation permet de passer entre **Carte des risques**, **Webcam**,
 **Alerte simulée** et **Historique des incendies**. La carte des risques conserve
-le maillage national, les scores experts et la régression BDIFF lorsqu’elle est calculée,
+le maillage national, les scores experts et la régression BDIFF,
 avec les réglages interactifs sans rechargement des données.
 Les contours des 96 départements restent visibles au-dessus des mailles. Un clic
 affiche une fiche départementale (effectif, médiane de la couche active et part de
