@@ -15,9 +15,9 @@ PAGES = [
      "Risque du jour calculé à partir du terrain et de la météo, consultable en archives, "
      "en direct ou en prévision. Cliquez un département pour l’explorer."),
     (MODE_ARCHIVES, "mode_archives", "Webcams", ":material/videocam:",
-     "Archives webcam",
-     "Rejouez des séquences d’images de caméras et de webcams publiques autour d’épisodes "
-     "d’incendie, de panache ou de nuages."),
+     "Webcams et archives",
+     "Consultez les vues de webcams publiques sur la carte ou rejouez des séquences "
+     "archivées autour d’épisodes d’incendie, de panache ou de nuages."),
     (MODE_FIRE_HISTORY, "mode_fire_history", "Historique", ":material/history:",
      "Incendies passés",
      "Feux recensés par la BDIFF en France métropolitaine, filtrables par année, mois, "

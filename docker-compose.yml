@@ -35,12 +35,14 @@ services:
     environment:
       API_URL: http://api:8000
       ARCHIVE_DIR: /archives
+      CAMERAS_PATH: /camera-directory/cameras.csv
       RISK_DIR: /risk
       FIRE_DATA_PATH: /incendies/Incendies.csv
       BDIFF_DIR: /bdiff
       WEATHER_PUBLIC_URL: ${WEATHER_PUBLIC_URL:-/app/static/weather/current.json}
     volumes:
       - ./archives-data:/archives:ro,z
+      - ./camera-data:/camera-directory:ro,z
       - ${RISK_DATA_DIR:-./risk-data}:/risk:ro,z
       - ./ifm_plus/data/raw/incendies:/incendies:ro,z
       - ./ifm_plus/data/raw/manual/bdiff:/bdiff:ro,z

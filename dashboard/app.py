@@ -22,8 +22,8 @@ if mode == MODE_RISK_MAP:
     from risk_map import risk_map
     risk_map()
 elif mode == MODE_ARCHIVES:
-    from archives import archives
-    archives()
+    from webcams import webcams
+    webcams()
 elif mode == MODE_FIRE_HISTORY:
     from fire_history import render_fire_history
     render_fire_history()

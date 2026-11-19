@@ -7,6 +7,7 @@ COPY assets ./assets
 COPY timeline_component ./timeline_component
 COPY risk_component ./risk_component
 COPY history_component ./history_component
+COPY static ./static
 EXPOSE 8501
 ENV STREAMLIT_THEME_BASE=light \
     STREAMLIT_THEME_PRIMARY_COLOR="#0b5d95" \

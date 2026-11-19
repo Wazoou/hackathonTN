@@ -11,6 +11,7 @@ with patch("timeline_gauge.render", return_value=None) as gauge:
     at = AppTest.from_file("/app/app.py", default_timeout=30).run()
     assert not at.exception, at.exception
     at.button(key="mode_archives").click().run()
+    at.radio(key="webcam_content_view").set_value("Archives enregistrées").run()
     assert not at.exception, at.exception
     assert "app_mode" not in at.session_state or at.session_state["app_mode"] == "Carte des archives"
     assert at.selectbox(key="archive_source").value == "all"

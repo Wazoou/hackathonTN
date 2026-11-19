@@ -170,7 +170,7 @@ La timeline couvre initialement toutes les dates, avec le curseur sur Fréjus à
 resserre la période sur les images correspondantes. **Affiner la période et les sources**
 permet de réélargir les dates ou de filtrer une source. Les repères restent visibles
 même sans données dans la période ; un clic permet de rejoindre leurs archives.
-Le fond sombre et le zoom molette sont conservés. Vert signifie « images disponibles »,
+Le fond OpenStreetMap et le zoom molette sont conservés. Vert signifie « images disponibles »,
 pas « incendie détecté ». Les dates Infoclimat sont les créneaux d’archive : l’heure
 exacte peut différer et apparaît dans l’image. Les images espacées sont regroupées
 manuellement pour le replay, sans inventer d’images dans les intervalles.
@@ -183,6 +183,45 @@ Pyro-SDIS est inconnu et la correspondance exacte des heures entre sources n’e
 
 Vérification du parcours après import :
 `docker compose exec -T dashboard python - < tests/check_webcam_ui.py`.
+
+## Catalogue de webcams publiques
+
+L'onglet **Webcams** réunit le catalogue de 105 vues publiques et les
+**Archives enregistrées**. Le fond OpenStreetMap correspond à celui des autres
+cartes. Le catalogue conserve des vues sur la végétation, les vallées et des
+horizons ruraux dans les 13 régions métropolitaines. Les images périodiques,
+YouTube et les flux vidéo reconnus disposent de leur lecteur respectif.
+Le modèle YOLO n'est pas connecté à ce catalogue.
+
+Le dashboard lit directement le fichier versionné `camera-data/cameras.csv`,
+monté en lecture seule dans Docker. Aucun JSON local, géocodage ou téléchargement
+de maillage supplémentaire n'est nécessaire pour afficher ces caméras.
+La variable `CAMERAS_PATH` permet de choisir un autre CSV complet ou un annuaire
+JSON au format historique. `CAMERAS_JSON_PATH` reste accepté hors Compose.
+
+Le CSV utilise les colonnes `url_youtube;ville;lat;lon;id_maille`.
+`url_youtube` est le nom historique de la colonne, également utilisé pour les
+images et autres flux. `ville` sert de libellé. Les coordonnées sont en WGS84 ;
+la maille correspond au point fourni, qui peut être une position communale
+approximative. Le détail des vérifications et de la provenance figure dans
+`camera-data/COUVERTURE_CAMERAS.md` et `camera-data/cameras.ajouts.csv`.
+
+Pour préparer de nouvelles entrées à partir de leur ville ou de coordonnées,
+le générateur optionnel reste disponible dans l'environnement géographique :
+
+```bash
+ifm_plus/.venv/bin/python ml/build_camera_directory.py
+```
+
+Il accepte un CSV à deux colonnes `url_youtube;ville` ou des colonnes `lat` et
+`lon` renseignées ensemble. Les positions fournies sont conservées ; les autres
+sont géocodées. Il génère `camera-data/camera.json` et nécessite le maillage local
+indiqué par `--mesh`. Pour le charger, définir `CAMERAS_PATH` sur ce JSON, ou
+reporter ses positions et identifiants de maille dans le CSV complet.
+
+Une caméra accessible lors d'un contrôle peut ensuite être indisponible ; les
+pages web seules et les logos de remplacement ne prouvent pas qu'un flux fonctionne.
+Les images et les sauvegardes de collecte restent hors de Git.
 
 ## 🔥 IFM+ et carte de risque de départ de feu (prévention)
 
