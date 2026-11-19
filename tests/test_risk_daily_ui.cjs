@@ -37,6 +37,8 @@ assert.equal(run('stats("33").count'),1);
 assert.equal(run('stats("33").median'),10);
 assert.equal(run('stats("33").high'),1);
 assert.match(run('departmentTooltipHTML("33")'),/10,0 départs.*100,0 % des mailles renseignées.*2022-07-12/s);
+assert.doesNotMatch(run('departmentHTML("33")'),/mailles de 2 km|mailles renseignées sur/);
+assert.match(run('departmentHTML("33")'),/Météo des stations du 2022-07-12\./);
 assert.equal(run('dataset.features'),originalFeatures);
 assert.equal(run('view'),originalView);
 assert.equal(run('selectedDept'),'33');

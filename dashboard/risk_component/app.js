@@ -220,10 +220,9 @@ function departmentInsightsHTML(dept){
 function departmentHTML(dept){
  const s=stats(dept),e=R.escape,[decimals,suffix]=unit(state.layer);
  return `<strong>${e(dataset.department_names[dept]||dept)} (${e(dept)})</strong><br>`+
-  `${fmt(s.count)} mailles de 2 km<br>`+
   `${e(dataset.layers[state.layer])} : médiane <b>${s.median===null?'Non disponible':fmt(s.median,decimals)+suffix}</b><br>`+
   `Mailles en classe élevée ou plus : <b>${s.high===null?'Non disponible':fmt(s.high*100,1)+' %'}</b><br>`+
-  `<span class="muted">${state.layer==='p_jour'?`${daily.kind==='observed'?'Météo des stations':daily.kind==='forecast'?'Météo prévue':'Météo modélisée'} du ${R.escape(daily.label)} · ${fmt(s.count)} mailles renseignées sur ${fmt(rows.get(dept).length)}.`:'Synthèse des mailles du département, sans météo du jour.'}</span>`;
+  `<span class="muted">${state.layer==='p_jour'?`${daily.kind==='observed'?'Météo des stations':daily.kind==='forecast'?'Météo prévue':'Météo modélisée'} du ${R.escape(daily.label)}.`:'Synthèse des mailles du département, sans météo du jour.'}</span>`;
 }
 function updateDepartmentDetails(){
  $('department-details').hidden=!selectedDept;
