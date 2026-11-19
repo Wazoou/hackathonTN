@@ -9,8 +9,8 @@ COPY risk_component ./risk_component
 COPY history_component ./history_component
 EXPOSE 8501
 ENV STREAMLIT_THEME_BASE=light \
-    STREAMLIT_THEME_PRIMARY_COLOR="#216e55" \
-    STREAMLIT_THEME_BACKGROUND_COLOR="#f3f5f4" \
+    STREAMLIT_THEME_PRIMARY_COLOR="#0b5d95" \
+    STREAMLIT_THEME_BACKGROUND_COLOR="#f4f6f8" \
     STREAMLIT_THEME_SECONDARY_BACKGROUND_COLOR="#ffffff" \
-    STREAMLIT_THEME_TEXT_COLOR="#253747"
-CMD ["streamlit", "run", "app.py", "--server.address=0.0.0.0", "--server.port=8501", "--server.enableStaticServing=true", "--browser.gatherUsageStats=false"]
+    STREAMLIT_THEME_TEXT_COLOR="#1d2b38"
+CMD ["streamlit", "run", "app.py", "--server.address=0.0.0.0", "--server.port=8501", "--server.enableStaticServing=true", "--browser.gatherUsageStats=false", "--client.toolbarMode=viewer"]

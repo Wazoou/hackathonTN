@@ -254,4 +254,4 @@ def render_fire_history() -> None:
         st.info("Aucun incendie recensé en France métropolitaine.")
         return
 
-    components.html(build_history_html(metropolitan_records), height=790, scrolling=True)
+    components.html(build_history_html(metropolitan_records), height=680, scrolling=True)

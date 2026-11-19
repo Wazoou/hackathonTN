@@ -49,11 +49,13 @@ function DailyControls({onDay,onLoading=()=>{}}){
  for(const name of ['archives','live','forecast'])el('daily-'+name).onclick=()=>selectMode(name);
  function status(){
   const line=el('daily-live-status');
-  if(!manifest){line.textContent='LIVE et PRÉDICTION : attente du collecteur météo.';return;}
+  if(!manifest){line.textContent='En direct et Prévision : en attente du collecteur météo.';line.setAttribute?.('data-stale','true');return;}
   const time=key=>key?new Date(key).toLocaleString('fr-FR',{timeZone:'Europe/Paris',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'indisponible';
   const age=manifest.retrieved_at?Date.now()-Date.parse(manifest.retrieved_at):Infinity;
-  line.textContent=`Open-Meteo · météo modélisée · collecte ${time(manifest.retrieved_at)} · prochaine vérification ${time(manifest.next_check)}.`+
-   (manifest.error?' Collecte interrompue : dernière carte conservée. '+manifest.error:age>3*3600000?' Données anciennes : actualisation en attente.':'');
+  line.textContent=manifest.error?(manifest.retrieved_at?`Météo en direct indisponible : dernière carte conservée (collecte du ${time(manifest.retrieved_at)}).`:'En direct et Prévision indisponibles : le collecteur météo ne répond pas.'):
+   `Météo Open-Meteo collectée le ${time(manifest.retrieved_at)} · prochaine mise à jour ${time(manifest.next_check)}`+
+   (age>3*3600000?' · données anciennes, actualisation en attente':'');
+  line.title=manifest.error?String(manifest.error):'';
   line.setAttribute?.('data-stale',String(age>3*3600000||!!manifest.error));
  }
  function labels(){
