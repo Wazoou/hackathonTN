@@ -111,7 +111,9 @@ function colors(){
    const v=value(f);
    const c=state.layer==='p_feu'?dataset.probability_colors[f._index]:
     (v==null||!Number.isFinite(v)||v<0)?[200,200,200,255]:
-    dataset.colors[Math.min(1000,Math.max(0,Math.round(R.scale(v,state.layer)*10)))];
+    (state.layer==='s_combustible'?dataset.natural_colors:
+     state.layer==='s_humain'?dataset.human_colors:dataset.colors)
+     [Math.min(1000,Math.max(0,Math.round(R.scale(v,state.layer)*10)))];
    array.set(c,f._index*4);
   }
   colorsCache.set(key,array);

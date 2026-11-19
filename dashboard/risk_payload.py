@@ -5,7 +5,8 @@ import hashlib
 import json
 from pathlib import Path
 
-from risk_data import CLASSES, LAYERS, combine, color, class_ranges, to_scale
+from risk_data import (CLASSES, HUMAN_CLASSES, LAYERS, NATURAL_CLASSES, combine, color,
+                       class_ranges, to_scale)
 from fire_statistics import department_fire_statistics
 
 
@@ -47,6 +48,8 @@ def build_payload(signature, history_signature=()):
             'department_names': json.loads((Path(__file__).parent / 'risk_component/departments.json').read_text()),
             'metadata': metadata, 'layers': layers,
             'classes': CLASSES, 'colors': [color(i / 10, 255) for i in range(1001)],
+            'natural_colors': [color(i / 10, 255, NATURAL_CLASSES) for i in range(1001)],
+            'human_colors': [color(i / 10, 255, HUMAN_CLASSES) for i in range(1001)],
             'probability_colors': [color(to_scale(f['properties']['p_feu'], 'p_feu'), 255)
                                    for f in features] if has_proba else [],
             'legends': {k: class_ranges(k) for k in layers}}

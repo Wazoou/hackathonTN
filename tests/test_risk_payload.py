@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'dashboard'))
 from risk_payload import file_signature, build_payload
-from risk_data import combine, color, to_scale
+from risk_data import HUMAN_CLASSES, NATURAL_CLASSES, combine, color, to_scale
 
 class RiskPayloadTests(unittest.TestCase):
     def test_lossless_geometry_properties_and_all_score_variants(self):
@@ -32,6 +32,14 @@ class RiskPayloadTests(unittest.TestCase):
                     self.assertEqual(data['scores'][f'additif:{step}'][i]/10,combine(c,h,'additif',step/20))
                 self.assertEqual(data['probability_colors'][i],color(to_scale(f['properties']['p_feu'],'p_feu'),255))
             self.assertIn('p_feu',data['layers'])
+            self.assertEqual(data['natural_colors'][0],color(0,255,NATURAL_CLASSES))
+            self.assertEqual(data['natural_colors'][-1],color(100,255,NATURAL_CLASSES))
+            self.assertEqual([entry[3] for entry in data['legends']['s_combustible']],
+                             [list(entry[2]) for entry in NATURAL_CLASSES])
+            self.assertEqual(data['human_colors'][0],color(0,255,HUMAN_CLASSES))
+            self.assertEqual(data['human_colors'][-1],color(100,255,HUMAN_CLASSES))
+            self.assertEqual([entry[3] for entry in data['legends']['s_humain']],
+                             [list(entry[2]) for entry in HUMAN_CLASSES])
             features[0]['properties'].pop('p_feu')
             path.write_text(json.dumps({'type':'FeatureCollection','features':features}))
             updated=file_signature(folder)
