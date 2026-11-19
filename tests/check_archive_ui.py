@@ -100,9 +100,6 @@ with patch("timeline_gauge.render", return_value=None) as gauge:
     assert at.session_state["replay_index"] == 6
     next(b for b in at.button if b.label == "← Précédente").click().run()
     assert at.session_state["replay_index"] == 5
-    at.button(key="mode_simulation").click().run()
-    assert not at.exception, at.exception
-    assert at.session_state["app_mode"] == "Surveillance simulée"
     at.button(key="mode_archives").click().run()
     assert not at.exception, at.exception
     assert at.session_state["app_mode"] == "Carte des archives"
@@ -114,4 +111,4 @@ with patch("timeline_gauge.render", return_value=None) as gauge:
     assert len(at.get('iframe')) == 1  # Filters now live inside the persistent map.
     at.button(key="mode_archives").click().run()
     assert not at.exception, at.exception
-    print("Période vide, lecture, simulation et historique des incendies : OK")
+    print("Période vide, lecture et historique des incendies : OK")

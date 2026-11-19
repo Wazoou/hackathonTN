@@ -3,7 +3,6 @@ import streamlit as st
 
 MODE_ARCHIVES = "Carte des archives"
 MODE_RISK_MAP = "Carte des risques"
-MODE_SIMULATION = "Surveillance simulée"
 MODE_FIRE_HISTORY = "Historique des incendies"
 MODE_KEY = "app_mode"
 
@@ -365,8 +364,8 @@ def header():
             unsafe_allow_html=True,
         )
         with st.container(key="nav_bar"):
-            _, risk_col, archives_col, simulation_col, history_col, _ = st.columns(
-                [1.85, 1.7, 1, 1.4, 2.2, 1.85], gap="small"
+            _, risk_col, archives_col, history_col, _ = st.columns(
+                [2.55, 1.7, 1, 2.2, 2.55], gap="small"
             )
             risk_col.button(
                 MODE_RISK_MAP,
@@ -381,13 +380,6 @@ def header():
                 type="primary" if mode == MODE_ARCHIVES else "secondary",
                 on_click=_set_mode,
                 args=(MODE_ARCHIVES,),
-            )
-            simulation_col.button(
-                "Alerte simulée",
-                key="mode_simulation",
-                type="primary" if mode == MODE_SIMULATION else "secondary",
-                on_click=_set_mode,
-                args=(MODE_SIMULATION,),
             )
             history_col.button(
                 MODE_FIRE_HISTORY,
