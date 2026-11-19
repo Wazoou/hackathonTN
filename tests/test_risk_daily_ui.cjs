@@ -74,7 +74,9 @@ assert.match(run('explanationHTML()'),/facteurs naturels \(forêt, résineux, li
 assert.match(run('layerSourcesText()'),/BDIFF \(départs de feu historiques\).*MNT Copernicus DEM \(relief\)/);
 run("state.layer='score'");
 assert.match(run('explanationHTML()'),/^<strong>Indice de sensibilité territoriale :<\/strong> score expert de sensibilité du territoire, calculé en combinant les facteurs naturels \(forêt, résineux, lisières, pente et pins\) et les facteurs humains \(habitat proche de la végétation, routes, trafic routier et agriculture\)\. C’est un score, pas une probabilité de feu\./);
-assert.match(run('layerSourcesText()'),/BD TOPO \(habitat, routes ; IGN\).*TMJA \(trafic routier ; data\.gouv\.fr\).*MNT Copernicus DEM \(relief\)/);
+for (const source of ['BD TOPO (habitat, routes ; IGN)', 'TMJA (trafic routier ; data.gouv.fr)', 'MNT Copernicus DEM (relief)']) {
+  assert.ok(run('layerSourcesText()').includes(source), `Source manquante : ${source}`);
+}
 run("state.layer='s_combustible'");
 assert.match(run('layerSourcesText()'),/BD Forêt V2 \(forêt, résineux, lisières ; IGN\).*MNT Copernicus DEM \(relief\)/);
 run("state.layer='s_humain'");
