@@ -57,10 +57,12 @@ fieldset:disabled label.choice{cursor:default;opacity:.55}fieldset:disabled labe
 select{width:100%}input[type=range]{width:100%;cursor:pointer}input:disabled{cursor:default}
 output{font-variant-numeric:tabular-nums;font-weight:700;color:var(--accent-strong);float:right}
 .hint{margin:6px 0 0}
+#layer-source-footer{margin-top:auto}
+#layer-sources{margin:0 0 20px}
 #department-details{border:1px solid #b9d4ea;background:#f6fafd;border-radius:var(--radius);padding:12px 14px;font-size:13px;line-height:1.6}
 #department-details ul{margin:5px 0 10px;padding-left:18px}
 .department-insights{border-top:1px solid var(--line);margin-top:10px;padding-top:10px}
-details.advanced{border-top:1px solid var(--line);padding-top:12px;margin-top:auto}
+details.advanced{border-top:1px solid var(--line);padding-top:12px;margin-top:0}
 details.advanced summary{cursor:pointer;font-size:13px;font-weight:600;color:var(--navy);list-style-position:outside}
 details.advanced[open] summary{margin-bottom:12px}
 details.advanced fieldset+fieldset{margin-top:14px}
@@ -107,10 +109,13 @@ table{width:100%;border-collapse:collapse;font-size:12px}td,th{padding:9px 7px;t
 <fieldset id="evaluation-layers" disabled></fieldset>
 <fieldset id="descriptive-layers" disabled></fieldset>
 </div>
+<div id="layer-source-footer">
+<p id="layer-sources" class="muted hint" aria-live="polite"></p>
 <details class="advanced"><summary>Réglages avancés du score expert</summary>
 <fieldset id="modes" disabled><legend>Combinaison</legend><label class="choice"><input type="radio" name="mode" value="multiplicatif" checked>Multiplicatif</label><label class="choice"><input type="radio" name="mode" value="additif">Additif</label></fieldset>
 <fieldset><label class="block" for="weight">Poids du combustible <output id="weight-value">60 %</output></label><input id="weight" type="range" min="0" max="20" step="1" value="12" disabled><p class="muted hint">Actif en mode additif avec la couche « Indice de sensibilité territoriale » ; le reste correspond à la pression humaine.</p></fieldset>
 </details>
+</div>
 </aside></div>
 <details id="daily-series" class="card" hidden><summary>Risque et feux déclarés autour de cette date</summary><div class="chart-legend"><span>Communes avec feu attendues (modèle)</span><span>Feux BDIFF déclarés</span></div><svg id="daily-chart" viewBox="0 0 1000 240" role="img" aria-label="Risque et feux observés autour de la date sélectionnée"></svg><p id="daily-validation" class="muted"></p></details>
 <script src="daily_logic.js"></script><script src="daily_controls.js"></script><script src="risk_logic.js"></script><script src="app.js"></script></body></html>

@@ -250,6 +250,10 @@ et pression humaine (BD TOPO, trafic, RPG). Le volet est **statique** : aucune c
 | **Caractéristiques du milieu naturel** | Sous-score 0–100 : résineux 40 %, forêt 25 %, lisières 15 %, pente 10 %, pins 10 %. |
 | **Facteurs d’influence humaine** | Sous-score 0–100 : habitat à moins de 200 m de la forêt (WUI) 40 %, routes pondérées 25 %, trafic 20 %, agriculture 15 %. |
 
+Le panneau de droite affiche les sources de la couche sélectionnée. Pour le risque du jour,
+la source météo indiquée suit le mode choisi : observations Météo-France, archives Open-Meteo,
+météo modélisée ou prévisions Open-Meteo.
+
 ### Score expert
 
 Les poids viennent de `ifm_plus/docs/modelisation_evaluation.md` ; il n’existe pas de pondération

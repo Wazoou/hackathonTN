@@ -65,11 +65,18 @@ assert.match(run('explanationHTML()'),/<strong>Évaluation du risque journalier 
 assert.match(run('explanationHTML()'),/caractéristiques du territoire .* prévisions météorologiques issues d’Open-Meteo/);
 assert.match(run('explanationHTML()'),/incertitude croissante avec l’échéance/);
 assert.doesNotMatch(run('explanationHTML()'),/Les probabilités communales sont réparties entre les mailles/);
+assert.match(run('layerSourcesText()'),/BDIFF .* Open-Meteo \(prévisions météorologiques\)/);
 run("state.layer='p_feu'");
 assert.match(run('explanationHTML()'),/^<strong>Probabilité annuelle d’incendie :<\/strong> probabilité estimée à partir des feux historiques BDIFF/);
 assert.match(run('explanationHTML()'),/facteurs naturels \(forêt, résineux, lisières, pente et pins\) et facteurs humains \(habitat proche de la végétation, routes, trafic routier et agriculture\)/);
+assert.match(run('layerSourcesText()'),/BDIFF \(départs de feu historiques\).*MNT Copernicus DEM \(relief\)/);
 run("state.layer='score'");
 assert.match(run('explanationHTML()'),/^<strong>Indice de sensibilité territoriale :<\/strong> score expert de sensibilité du territoire, calculé en combinant les facteurs naturels \(forêt, résineux, lisières, pente et pins\) et les facteurs humains \(habitat proche de la végétation, routes, trafic routier et agriculture\)\. C’est un score, pas une probabilité de feu\./);
+assert.match(run('layerSourcesText()'),/BD TOPO \(habitat, routes ; IGN\).*TMJA \(trafic routier ; data\.gouv\.fr\).*MNT Copernicus DEM \(relief\)/);
+run("state.layer='s_combustible'");
+assert.match(run('layerSourcesText()'),/BD Forêt V2 \(forêt, résineux, lisières ; IGN\).*MNT Copernicus DEM \(relief\)/);
+run("state.layer='s_humain'");
+assert.match(run('layerSourcesText()'),/BD TOPO \(habitat, routes ; IGN\).*RPG \(agriculture ; IGN\).*TMJA \(trafic routier ; data\.gouv\.fr\)/);
 run("state.layer='p_jour'");
 context.input={key:'wrong',values:pack([5]),fwi:null};
 assert.throws(()=>run('applyDaily(input)'),/incompatibles/);

@@ -256,6 +256,25 @@ function explanationHTML(){
   return 'Sous-score de pression humaine, calculé à partir de l’habitat proche de la végétation, des routes, du trafic routier et de l’agriculture.';
  return '<strong>Indice de sensibilité territoriale :</strong> score expert de sensibilité du territoire, calculé en combinant les facteurs naturels (forêt, résineux, lisières, pente et pins) et les facteurs humains (habitat proche de la végétation, routes, trafic routier et agriculture). C’est un score, pas une probabilité de feu.';
 }
+function layerSourcesText(){
+ const grid='Carroyage DFCI 2 km (grille de référence ; data.gouv.fr)';
+ const natural='BD Forêt V2 (forêt, résineux, lisières ; IGN) et MNT Copernicus DEM (relief)';
+ const human='BD TOPO (habitat, routes ; IGN), RPG (agriculture ; IGN) et TMJA (trafic routier ; data.gouv.fr)';
+ const territory='BD Forêt V2 (forêt, résineux, lisières ; IGN), BD TOPO (habitat, routes ; IGN), RPG (agriculture ; IGN), TMJA (trafic routier ; data.gouv.fr) et MNT Copernicus DEM (relief)';
+ if(state.layer==='p_jour'){
+  const weather=daily.kind==='observed'?'Météo-France (observations météorologiques)':
+   daily.kind==='forecast'?'Open-Meteo (prévisions météorologiques)':
+   daily.kind==='live'?'Open-Meteo (météo modélisée)':'Open-Meteo (archives météo modélisées)';
+  return `Sources : BDIFF (départs de feu historiques), ${territory}, ${grid} ; météo : ${weather}.`;
+ }
+ if(state.layer==='p_feu')
+  return `Sources : BDIFF (départs de feu historiques) et données territoriales (${territory}, ${grid}).`;
+ if(state.layer==='s_combustible')
+  return `Sources : ${natural} ; ${grid}.`;
+ if(state.layer==='s_humain')
+  return `Sources : ${human} ; ${grid}.`;
+ return `Sources : ${natural} ; ${human} ; ${grid}.`;
+}
 function update(kind='layer'){
  if(!dataset||!map)return;
  const start=performance.now();
@@ -269,6 +288,7 @@ function update(kind='layer'){
   span.append(swatch,document.createTextNode(`${name} (${high?low+'–'+high:'≥ '+low})`));$('legend').append(span);
  }
  $('explanation').innerHTML=explanationHTML();
+ $('layer-sources').textContent=layerSourcesText();
  updateDepartmentDetails();
  if(kind==='department'){
   fit();
