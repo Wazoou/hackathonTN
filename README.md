@@ -20,6 +20,7 @@ sur un repère ouvre le lecteur du direct ; le mode **Archives enregistrées** c
 la carte, la timeline et le lecteur Pyro-SDIS / webcams. Les manifestes d’archives restent indépendants ;
 leur index commun conserve les chemins d’images, dates, sources, splits et annotations.
 Les identifiants sont préfixés par la source pour éviter les collisions.
+Les webcams hors du maillage de risque restent visibles sur la carte, sans maille associée.
 L’import actuel représente **12 252 images, 200 identifiants de caméras et 10 repères** :
 6 départements Pyro-SDIS (losanges) et 4 webcams (ronds). La précision des coordonnées
 est indiquée dans les infobulles et sous le lecteur.

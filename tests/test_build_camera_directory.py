@@ -132,6 +132,23 @@ class CameraDirectoryTests(unittest.TestCase):
         self.assertEqual(result[0]["id_maille"], "cell-1")
         self.assertEqual(tuple(result[0]), OUTPUT_FIELDS)
 
+    def test_keeps_cameras_outside_the_risk_mesh(self):
+        mesh = gpd.GeoDataFrame(
+            {"cell_code": ["cell-1"], "geometry": [box(0, 0, 1, 1)]},
+            crs="EPSG:4326",
+        )
+        camera = {
+            "nom": "Testville",
+            "url_youtube": "https://www.youtube.com/watch?v=abc123",
+            "lat": 5,
+            "lon": 5,
+        }
+
+        result = assign_cameras_to_mesh([camera], mesh, "cell_code")
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["id_maille"], "Hors maillage")
+
     def test_build_directory_matches_csv_and_removes_deleted_cameras(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
@@ -177,6 +194,7 @@ class CameraDirectoryTests(unittest.TestCase):
                 "https://youtu.be/def456",
             }
             self.assertEqual(len(result), 2)
+            self.assertEqual(len(session.params), 1)
             self.assertEqual({camera["url_youtube"] for camera in exported}, expected_urls)
             self.assertEqual(len(load_camera_directory(output_path)), 2)
             self.assertTrue(all(tuple(camera) == OUTPUT_FIELDS for camera in exported))

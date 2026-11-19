@@ -1,0 +1,152 @@
+# Webcams publiques - GRAND EST (collecte hackathon)
+# Format : URL;ville (une par ligne)
+# Sources explorees : opencctv.org, fr.worldcam.eu, france-webcams.fr,
+# monde-du-voyage.com, YouTube, inforoute.alsace.eu, vision-environnement,
+# meteohorizon, easeweather, labresse.net, gerardmer.net, metz.fr, nancy.fr,
+# skaping.com, webcam-autoroute.eu, roundshot.com, airportwebcams.net.
+# Accent mis sur le centre de la France : villes interieures, vignobles,
+# stations de montagne des Vosges, trafic routier (A4, A31, A35, A36).
+
+# ================= opencctv.org (Grand Est, ~56 webcams uniques) =================
+https://opencctv.org/cameras/france/grand-est/strasbourg/strasbourg-aero-club-alsace-74455;Strasbourg
+https://opencctv.org/cameras/france/grand-est/champ-du-feu-charbonniere/champ-du-feu-charbonniere-d214-128831;Champ-du-Feu
+https://opencctv.org/cameras/france/grand-est/giffaumont-champaubert/giffaumont-champaubert-lake-der-chantecoq-300753;Giffaumont-Champaubert
+https://opencctv.org/cameras/france/grand-est/giffaumont-champaubert/lac-du-der-chantecoq-france-301591;Giffaumont-Champaubert
+https://opencctv.org/cameras/france/grand-est/gerardmer/gerardmer-vue-sur-le-lac-de-301594;Gerardmer
+https://opencctv.org/cameras/france/grand-est/hageville/hageville-chambley-bussieres-air-base-302490;Hageville
+https://opencctv.org/cameras/france/grand-est/troyes/a5-pres-de-troyes-vue-orientee-vers-paris-390948;Troyes
+https://opencctv.org/cameras/france/grand-est/bitschwiller-les-thann/bitschwiller-les-thann-304733;Bitschwiller-les-Thann
+https://opencctv.org/cameras/france/grand-est/bitschwiller-les-thann/bitschwiller-les-thann-thannerhubel-314065;Bitschwiller-les-Thann
+https://opencctv.org/cameras/france/grand-est/buhl-lorraine/buhl-lorraine-aerodrome-de-sarrebourg-buhl-sarrebourg-351783;Buhl-Lorraine
+https://opencctv.org/cameras/france/grand-est/bussang/bussang-north-east-le-drumont-422458;Bussang
+https://opencctv.org/cameras/france/grand-est/bussang/bussang-south-east-cimetiere-422738;Bussang
+https://opencctv.org/cameras/france/grand-est/chaligny/chaligny-southeast-grand-est-302509;Chaligny
+https://opencctv.org/cameras/france/grand-est/d14/clone-of-webcam-sur-la-d14-dans-la-cote-saint-michel-vue-o-328548;Cote-Saint-Michel
+https://opencctv.org/cameras/france/grand-est/langres/courcelles-en-montagne-langres-a31-pres-de-langres-entre-dijon-et-langres-a-hauteur-des-aires-de-service-de-langres-vue-orientee-vers-dijon-455009;Langres
+https://opencctv.org/cameras/france/grand-est/d654-illange-328550;Illange
+https://opencctv.org/cameras/france/grand-est/dabo/dabo-grand-est-308656;Dabo
+https://opencctv.org/cameras/france/grand-est/dogneville/dogneville-aero-club-vosgien-317464;Dogneville
+https://opencctv.org/cameras/france/grand-est/doncourt-les-conflans/doncourt-les-conflans-airport-351779;Doncourt-les-Conflans
+https://opencctv.org/cameras/france/grand-est/douzy/douzy-grand-est-311170;Douzy
+https://opencctv.org/cameras/france/grand-est/ecury-sur-coole/ecury-airfield-grand-est-352060;Ecury-sur-Coole
+https://opencctv.org/cameras/france/grand-est/epinal/epinal-quai-jules-ferry-357638;Epinal
+https://opencctv.org/cameras/france/grand-est/frauenberg/frauenberg-312079;Frauenberg
+https://opencctv.org/cameras/france/grand-est/freland/freland-south-west-421692;Freland
+https://opencctv.org/cameras/france/grand-est/gros-rederching/gros-rederching-302584;Gros-Rederching
+https://opencctv.org/cameras/france/grand-est/guemar/guemar-grand-est-309903;Guemar
+https://opencctv.org/cameras/france/grand-est/husseren-wesserling/husseren-wesserling-alsace-306575;Husseren-Wesserling
+https://opencctv.org/cameras/france/grand-est/kingersheim/kingersheim-309409;Kingersheim
+https://opencctv.org/cameras/france/grand-est/vagney/la-croix-des-hetres-vagney-305581;Vagney
+https://opencctv.org/cameras/france/grand-est/la-salle/la-salle-col-du-haut-du-bois-309152;La-Salle
+https://opencctv.org/cameras/france/grand-est/la-vancelle/la-vancelle-grand-est-france-303344;La-Vancelle
+https://opencctv.org/cameras/france/grand-est/villette/longuyon-grand-est-304459;Villette
+https://opencctv.org/cameras/france/grand-est/dommartemont/marie-marvingt-airclub-dommartemont-305919;Dommartemont
+https://opencctv.org/cameras/france/grand-est/mesnil-saint-pere/mesnil-saint-pere-lac-dorient-le-lac-390815;Mesnil-Saint-Pere
+https://opencctv.org/cameras/france/grand-est/lutterbach/morschwiller-le-bas-east-a36-455022;Lutterbach
+https://opencctv.org/cameras/france/grand-est/murbach/murbach-le-petit-ballon-302685;Murbach
+https://opencctv.org/cameras/france/grand-est/mussey-sur-marne/mussey-sur-marne-east-422413;Mussey-sur-Marne
+https://opencctv.org/cameras/france/grand-est/mussey-sur-marne/mussey-sur-marne-east-aerodrome-de-joinville-mussey-422528;Mussey-sur-Marne
+https://opencctv.org/cameras/france/grand-est/nancy/nancy-barriere-de-peage-de-gye-sur-lautoroute-a31-pres-de-toul-vue-orientee-vers-dijon-455008;Nancy
+https://opencctv.org/cameras/france/grand-est/nancy/nancy-place-stanislas-390793;Nancy
+https://opencctv.org/cameras/france/grand-est/tomblaine/nancy-essey-airport-tomblaine-351781;Tomblaine
+https://opencctv.org/cameras/france/grand-est/neuilly-sur-suize/neuilly-sur-suize-south-west-haute-marne-424753;Neuilly-sur-Suize
+https://opencctv.org/cameras/france/grand-est/plivot/plivot-grand-est-311244;Plivot
+https://opencctv.org/cameras/france/grand-est/plivot/plivot-grand-est-312737;Plivot
+https://opencctv.org/cameras/france/grand-est/plivot/plivot-grand-est-311872;Plivot
+https://opencctv.org/cameras/france/grand-est/rouffach/rouffach-petit-ballon-vosges-304136;Rouffach
+https://opencctv.org/cameras/france/grand-est/sarralbe/sarralbe-north-west-tele-cigognes-421956;Sarralbe
+https://opencctv.org/cameras/france/grand-est/schwindratzheim/schwindratzheim-a4-peage-de-schwindratzheim-paris-455509;Schwindratzheim
+https://opencctv.org/cameras/france/grand-est/schwindratzheim/schwindratzheim-a4-peage-de-schwindratzheim-strasbourg-455510;Schwindratzheim
+https://opencctv.org/cameras/france/grand-est/seichamps/seichamps-south-west-315174;Seichamps
+https://opencctv.org/cameras/france/grand-est/semoutiers-montsaon/semoutiers-montsaon-355152;Semoutiers-Montsaon
+https://opencctv.org/cameras/france/grand-est/troyes/troyes-307468;Troyes
+https://opencctv.org/cameras/france/grand-est/troyes/troyes-place-alexandre-israel-390890;Troyes
+https://opencctv.org/cameras/france/grand-est/urbeis/urbeis-col-durbeis-308587;Urbeis
+https://opencctv.org/cameras/france/grand-est/urbes/urbes-south-east-ferme-auberge-gustiberg-urbes-col-de-bussang-chambres-en-demi-pension-422463;Urbes
+https://opencctv.org/cameras/france/grand-est/vieux-ferrette/vieux-ferrette-north-west-315306;Vieux-Ferrette
+https://opencctv.org/cameras/france/grand-est/d16-a-aumetz-vue-orientee/webcam-sur-la-d16-a-aumetz-vue-orientee-vers-a30-328547;Aumetz
+https://opencctv.org/cameras/france/grand-est/d55-a-talange/webcam-sur-la-d55-a-talange-au-niveau-du-pont-surplombant-l-328546;Talange
+https://opencctv.org/cameras/france/grand-est/audun-le-tiche/webcams-sur-la-d616-sur-le-contournement-daudun-le-tiche-m-328544;Audun-le-Tiche
+https://opencctv.org/cameras/france/grand-est/d616/webcams-sur-la-d616-sur-le-contournement-daudun-le-tiche-328545;Audun-le-Tiche
+https://opencctv.org/cameras/france/grand-est/zoufftgen/zoufftgen-310247;Zoufftgen
+
+# ================= fr.worldcam.eu (Grand Est, 36 webcams) =================
+https://fr.worldcam.eu/webcams/europe/france/35564-chaligny-vallee-de-la-moselle;Chaligny
+https://fr.worldcam.eu/webcams/europe/france/33437-col-du-bonhomme;Col-du-Bonhomme
+https://fr.worldcam.eu/webcams/europe/france/4783-corny-sur-moselle;Corny-sur-Moselle
+https://fr.worldcam.eu/webcams/europe/france/37298-epinal-riviere-moselle;Epinal
+https://fr.worldcam.eu/webcams/europe/france/28000-gerardmer-residence-les-spatules;Gerardmer
+https://fr.worldcam.eu/webcams/europe/france/8695-givet-place-carnot;Givet
+https://fr.worldcam.eu/webcams/europe/france/19859-gros-rederching-sud-est;Gros-Rederching
+https://fr.worldcam.eu/webcams/europe/france/14987-huningue-place-abbatucci-parc-des-eaux-vives;Huningue
+https://fr.worldcam.eu/webcams/europe/france/4779-kaysersberg-place-de-lhotel-de-ville;Kaysersberg
+https://fr.worldcam.eu/webcams/europe/france/35590-la-bresse-les-chantenees;La-Bresse
+https://fr.worldcam.eu/webcams/europe/france/35591-la-bresse-lispach;La-Bresse
+https://fr.worldcam.eu/webcams/europe/france/35589-la-bresse-place-du-champtel;La-Bresse
+https://fr.worldcam.eu/webcams/europe/france/907-le-ballon-dalsace;Le-Ballon-dAlsace
+https://fr.worldcam.eu/webcams/europe/france/36309-mesnil-saint-pere-lac-de-la-foret-dorient;Mesnil-Saint-Pere
+https://fr.worldcam.eu/webcams/europe/france/10495-metz-coeur-imperial;Metz
+https://fr.worldcam.eu/webcams/europe/france/4784-metz-place-darmes;Metz
+https://fr.worldcam.eu/webcams/europe/france/4774-metz-place-de-la-republique;Metz
+https://fr.worldcam.eu/webcams/europe/france/17103-muhlbach-sur-munster-gaschney360;Muhlbach-sur-Munster
+https://fr.worldcam.eu/webcams/europe/france/26584-mulhouse-laboratoire-de-joaillerie-guillosson;Mulhouse
+https://fr.worldcam.eu/webcams/europe/france/4781-mulhouse-place-de-la-reunion;Mulhouse
+https://fr.worldcam.eu/webcams/europe/france/13168-munster-place-du-marche;Munster
+https://fr.worldcam.eu/webcams/europe/france/26556-munster-nid-de-cigogne;Munster
+https://fr.worldcam.eu/webcams/europe/france/1049-nancy-place-stanislas;Nancy
+https://fr.worldcam.eu/webcams/europe/france/41007-neuilly-sur-suize-station-meteorologique;Neuilly-sur-Suize
+https://fr.worldcam.eu/webcams/europe/france/9472-oderen-le-markstein;Oderen
+https://fr.worldcam.eu/webcams/europe/france/40231-reims-cathedrale-notre-dame;Reims
+https://fr.worldcam.eu/webcams/europe/france/40751-roncourt-nichoir;Roncourt
+https://fr.worldcam.eu/webcams/europe/france/39915-saint-dizier-la-place-aristide-briand-et-le-theatre;Saint-Dizier
+https://fr.worldcam.eu/webcams/europe/france/18234-sarralbe-cigognes;Sarralbe
+https://fr.worldcam.eu/webcams/europe/france/14456-sarreguemines-radio-melodie;Sarreguemines
+https://fr.worldcam.eu/webcams/europe/france/10134-schnepfenried;Schnepfenried
+https://fr.worldcam.eu/webcams/europe/france/32462-socourt-etangs-de-peche;Socourt
+https://fr.worldcam.eu/webcams/europe/france/14357-strasbourg-planeurs-strasbourg;Strasbourg
+https://fr.worldcam.eu/webcams/europe/france/25582-tromborn-eglise-saint-eloi;Tromborn
+https://fr.worldcam.eu/webcams/europe/france/3764-troyes-place-alexandre-israel;Troyes
+https://fr.worldcam.eu/webcams/europe/france/19860-parc-naturel-regional-des-ballons-des-vosges-refuge-du-sotre;Ballons-des-Vosges
+
+# ================= france-webcams.fr (departements Grand Est) =================
+https://france-webcams.fr/grand-est/08-ardennes/1.1036-webcams-de-france-givet.html;Givet
+https://france-webcams.fr/grand-est/10-aube/1.591-webcam-de-france-mesnil-saint-pere.html;Mesnil-Saint-Pere
+https://france-webcams.fr/grand-est/68-haut-rhin/1.1085-webcams-de-france-munster.html;Munster
+https://france-webcams.fr/grand-est/68-haut-rhin/1.1084-webcams-de-france-mulhouse.html;Mulhouse
+https://france-webcams.fr/grand-est/68-haut-rhin/1.1083-webcams-de-france-munster.html;Munster
+
+# ================= inforoute.alsace.eu (cols des Vosges - images directes JPG) =================
+https://inforoute.alsace.eu/webcam67/DONON/lastimage.jpeg;Donon
+https://inforoute.alsace.eu/webcam67/CHAMP-DU-FEU/lastimage.jpeg;Champ-du-Feu
+https://inforoute.alsace.eu/webcam67/HANTZ/lastimage.jpeg;Col-de-Hantz
+https://inforoute.alsace.eu/webcam67/SAALES/lastimage.jpeg;Col-de-Saales
+
+# ================= vision-environnement.com (direct/HTML) =================
+https://www.vision-environnement.com/webcam/france/grand-est/22999-reims;Reims
+https://www.vision-environnement.com/webcam/france/grand-est/24313-schwindratzheim-a4-peage-de-schwindratzheim-vers-strasbourg;Schwindratzheim
+https://www.vision-environnement.com/webcam/france/grand-est/24135-morschwiller-le-bas-a36-mulhouse-ouest-vers-mulhouse;Morschwiller-le-Bas
+https://www.vision-environnement.com/webcam/france/grand-est/24315-tinqueux-a26-peage-d-ormes-vers-troyes;Tinqueux
+
+# ================= roundshot / skaping / meteohorizon / easeweather =================
+https://backend.roundshot.com/cams/216/thumbnail;Reims
+https://www.skaping.com/reims/cathedrale/video;Reims
+https://www.meteohorizon.com/europe/france/grand-est/haut-rhin/colmar/webcam;Colmar
+https://www.easeweather.com/europe/france/grand-est/haut-rhin/colmar/webcam;Colmar
+https://www.meteohorizon.com/europe/france/grand-est/vosges/gerardmer/webcam;Gerardmer
+
+# ================= Offices de tourisme / mairies (Vosges montagne) =================
+https://www.labresse.net/nos-webcams;La-Bresse
+https://gerardmer.net/webcams.php;Gerardmer
+https://metz.fr/decouvrir-partager/webcams/;Metz
+https://www.nancy.fr/nancy-la-ville/webcam;Nancy
+https://www.colmar.fr/colmar-et-vous;Colmar
+https://www.lavieamulhouse.com/;Mulhouse
+
+# ================= Trafic routier (webcam-autoroute.eu) =================
+https://www.webcam-autoroute.eu/cameras/strasbourg;Strasbourg
+https://www.webcam-autoroute.eu/cameras/metz;Metz
+https://www.webcam-autoroute.eu/cameras/nancy;Nancy
+
+# ================= YouTube =================
+https://www.youtube.com/@Mulhouse68/streams;Mulhouse
+https://www.youtube.com/watch?v=ZWIPxFv6XRQ;Munster

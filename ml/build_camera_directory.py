@@ -238,6 +238,12 @@ def assign_cameras_to_mesh(
         )
         matches = pd.concat([matches, boundary_matches])
 
+    matched_urls = set(matches["url_youtube"])
+    outside_mesh = points.loc[~points["url_youtube"].isin(matched_urls)].copy()
+    if not outside_mesh.empty:
+        outside_mesh["__id_maille"] = "Hors maillage"
+        matches = pd.concat([matches, outside_mesh])
+
     matches = matches.assign(__id_sort=matches["__id_maille"].astype(str))
     matches = matches.sort_values(["url_youtube", "__id_sort"], kind="stable")
     matches = matches.drop_duplicates(subset="url_youtube")
@@ -293,13 +299,22 @@ def build_directory(
 
     new_entries: list[dict[str, Any]] = []
     skipped_geocode: list[str] = []
+    coordinates_by_city: dict[str, tuple[float, float] | None] = {}
     for camera in csv_cameras:
-        try:
-            lat, lon = geocode_city(geocoding_session, camera["nom"])
-        except (ValueError, RuntimeError) as exc:
-            skipped_geocode.append(f"{camera['nom']} ({exc})")
-            output_fn(f"Ville « {camera['nom']} » ignorée : {exc}")
+        city_key = " ".join(camera["nom"].split()).casefold()
+        if city_key not in coordinates_by_city:
+            try:
+                coordinates_by_city[city_key] = geocode_city(
+                    geocoding_session, camera["nom"]
+                )
+            except (ValueError, RuntimeError) as exc:
+                coordinates_by_city[city_key] = None
+                skipped_geocode.append(f"{camera['nom']} ({exc})")
+                output_fn(f"Ville « {camera['nom']} » ignorée : {exc}")
+        coordinates = coordinates_by_city[city_key]
+        if coordinates is None:
             continue
+        lat, lon = coordinates
         new_entries.append({**camera, "lat": lat, "lon": lon})
         output_fn(f"Ville « {camera['nom']} » localisée : {lat:.5f}, {lon:.5f}.")
 
@@ -311,15 +326,6 @@ def build_directory(
         )
 
     located = assign_cameras_to_mesh(new_entries, mesh, id_column)
-    located_urls = {camera["url_youtube"] for camera in located}
-    unmatched = [camera["nom"] for camera in new_entries if camera["url_youtube"] not in located_urls]
-    if unmatched:
-        output_fn(
-            f"{len(unmatched)} ville(s) hors du maillage des risques (ignorées) : "
-            + ", ".join(unmatched[:10])
-            + (" ..." if len(unmatched) > 10 else "")
-        )
-
     write_json(output_json, located)
     output_fn(f"Annuaire synchronisé avec le CSV : {len(located)} webcam(s) dans {output_json}.")
     return located

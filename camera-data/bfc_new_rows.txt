@@ -1,0 +1,58 @@
+https://opencctv.org/still/301343.jpg;Les Rousses
+https://opencctv.org/still/303579.jpg;Foncine-le-Haut
+https://opencctv.org/still/303606.jpg;Darois
+https://opencctv.org/still/304504.jpg;Metabief
+https://opencctv.org/still/455021.jpg;Montbéliard
+https://opencctv.org/still/455011.jpg;Auxerre
+https://opencctv.org/still/306587.jpg;Darois
+https://opencctv.org/still/310324.jpg;Arcon
+https://opencctv.org/still/307973.jpg;Autun
+https://opencctv.org/still/455508.jpg;Auxerre
+https://opencctv.org/still/455007.jpg;Beaune
+https://opencctv.org/still/349997.jpg;Champforgeuil
+https://opencctv.org/still/306635.jpg;Charnay-les-Macon
+https://opencctv.org/still/318542.jpg;Chaux
+https://opencctv.org/still/307942.jpg;Cosne-Cours-sur-Loire
+https://opencctv.org/still/315628.jpg;Courcelles-les-Montbeliard
+https://opencctv.org/still/309611.jpg;Darois
+https://opencctv.org/still/306695.jpg;Fournet-Blancheroche
+https://opencctv.org/still/307890.jpg;Gisy-les-Nobles
+https://opencctv.org/still/310627.jpg;Gray
+https://opencctv.org/still/352785.jpg;La Chaux
+https://opencctv.org/still/410220.jpg;Les Grangettes
+https://opencctv.org/still/421110.jpg;Messigny-et-Vantoux
+https://opencctv.org/still/305495.jpg;Montbeliard
+https://opencctv.org/still/310986.jpg;Montlebon
+https://opencctv.org/still/307964.jpg;Montret
+https://opencctv.org/still/309994.jpg;Morre
+https://opencctv.org/still/311081.jpg;Mouthe
+https://opencctv.org/still/351914.jpg;Pouilloux
+https://opencctv.org/still/455016.jpg;Beaune
+https://opencctv.org/still/455010.jpg;Montbeliard
+https://opencctv.org/still/204574.jpg;Les Rousses
+https://fr.worldcam.eu/webcams/europe/france/495-besancon-faubourg-rivotte-place-flore;Besançon
+https://fr.worldcam.eu/webcams/europe/france/37540-bonlieu-chalets-lodges-hedgehog;Bonlieu
+https://fr.worldcam.eu/webcams/europe/france/34906-chaux-aerodrome-de-belfort-chaux;Chaux
+https://fr.worldcam.eu/webcams/europe/france/28869-cluny-carriere-equivallee;Cluny
+https://fr.worldcam.eu/webcams/europe/france/6606-cosne-cours-sur-loire-aeroclub;Cosne-Cours-sur-Loire
+https://fr.worldcam.eu/webcams/europe/france/40998-dezize-les-maranges-vallee-des-maranges;Dezize-lès-Maranges
+https://fr.worldcam.eu/webcams/europe/france/28870-digoin-pont-canal;Digoin
+https://fr.worldcam.eu/webcams/europe/france/32195-dijon-autoroute-a39;Dijon
+https://fr.worldcam.eu/webcams/europe/france/40997-genelard-canal-du-centre;Génelard
+https://fr.worldcam.eu/webcams/europe/france/40996-givry-vignobles;Givry
+https://fr.worldcam.eu/webcams/europe/france/30117-la-pesse;La Pesse
+https://fr.worldcam.eu/webcams/europe/france/41748-les-grangettes-lac-saint-point;Les Grangettes
+https://fr.worldcam.eu/webcams/europe/france/28861-louhans-la-seille;Louhans
+https://fr.worldcam.eu/webcams/europe/france/28860-louhans-pl-marcel-guinot;Louhans
+https://fr.worldcam.eu/webcams/europe/france/21555-macon-vue-panoramique;Mâcon
+https://fr.worldcam.eu/webcams/europe/france/41747-malbuisson-lac-saint-point;Malbuisson
+https://fr.worldcam.eu/webcams/europe/france/34227-metabief-station-de-ski;Métabief
+https://fr.worldcam.eu/webcams/europe/france/4788-nevers-aeroport-de-nevers-fourchambault;Nevers
+https://fr.worldcam.eu/webcams/europe/france/28871-paray-le-monial-vue-panoramique;Paray-le-Monial
+https://fr.worldcam.eu/webcams/europe/france/25850-rougemont-le-chateau-golf-club;Rougemont-le-Château
+https://fr.worldcam.eu/webcams/europe/france/16750-saint-jean-de-losne-marina;Saint-Jean-de-Losne
+https://fr.worldcam.eu/webcams/europe/france/28859-tournus-saone;Tournus
+https://fr.worldcam.eu/webcams/europe/france/40999-verdun-ciel-le-doubs;Verdun-sur-le-Doubs
+https://www.viewsurf.com/univers/trafic/vue/7374-france-bourgogne-dijon-autoroute-a39-en-peripherie-de-dijon-est-et-a-proximite-de-la-barriere-de-peage-de-crimolois-vue-or;Dijon
+https://www.youtube.com/watch?v=tRx_rSxlGNs;Dijon
+https://www.youtube.com/watch?v=otnuEAoTtiw;Belfort

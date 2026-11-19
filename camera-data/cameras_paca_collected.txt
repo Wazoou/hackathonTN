@@ -1,0 +1,165 @@
+# Webcams PACA collectées - Format: URL;ville
+# Source: opencctv.org (48 caméras direct feed)
+https://opencctv.org/cameras/france/provence-alpes-cote-dazur/abries-ristolas/abries-hautes-alpes-309949;Abries-Ristolas
+https://opencctv.org/cameras/france/provence-alpes-cote-dazur/allos/allos-east-316153;Allos
+https://opencctv.org/cameras/france/provence-alpes-cote-dazur/allos/allos-north-la-foux-dallos-315663;Allos
+https://opencctv.org/cameras/france/provence-alpes-cote-dazur/antibes/antibes-panoramique-hd-455547;Antibes
+https://opencctv.org/cameras/france/provence-alpes-cote-dazur/antibes/antibes-panoramique-hd-454965;Antibes
+https://opencctv.org/cameras/france/provence-alpes-cote-dazur/antibes/antibes-video-455548;Antibes
+https://opencctv.org/cameras/france/provence-alpes-cote-dazur/antibes/antibes-video-454964;Antibes
+https://opencctv.org/cameras/france/provence-alpes-cote-dazur/arvieux/arvieux-hautes-alpes-312024;Arvieux
+https://opencctv.org/cameras/france/provence-alpes-cote-dazur/auron/auron-303083;Auron
+https://opencctv.org/cameras/france/provence-alpes-cote-dazur/nice/avenue-aime-martin-nice-301454;Nice
+https://opencctv.org/cameras/france/provence-alpes-cote-dazur/bandol/bandol-309183;Bandol
+https://opencctv.org/cameras/france/provence-alpes-cote-dazur/baratier/baratier-d40-128802;Baratier
+https://opencctv.org/cameras/france/provence-alpes-cote-dazur/barcelonnette/barcelonnette-lubaye-454999;Barcelonnette
+https://opencctv.org/cameras/france/provence-alpes-cote-dazur/barcelonnette/cote-dazur-barcelonnette-le-sauze-390960;Barcelonnette
+https://opencctv.org/cameras/france/provence-alpes-cote-dazur/beaulieu-sur-mer/beaulieu-sur-mer-france-304380;Beaulieu-sur-Mer
+https://opencctv.org/cameras/france/provence-alpes-cote-dazur/bras/bras-la-provence-verte-302923;Bras
+https://opencctv.org/cameras/france/provence-alpes-cote-dazur/cagnes-sur-mer/cagnes-sur-mer-live-396869;Cagnes-sur-Mer
+https://opencctv.org/cameras/france/provence-alpes-cote-dazur/cassis/calanques-massif-cassis-306617;Cassis
+https://opencctv.org/cameras/france/provence-alpes-cote-dazur/cannes/cannes-filmpantiero-455542;Cannes
+https://opencctv.org/cameras/france/provence-alpes-cote-dazur/cannes/cannes-panoramique-hd-454958;Cannes
+https://opencctv.org/cameras/france/provence-alpes-cote-dazur/cap-dail/cap-dail-live-455564;Cap-d'Ail
+https://opencctv.org/cameras/france/provence-alpes-cote-dazur/cap-dail/cap-dail-panoramique-455563;Cap-d'Ail
+https://opencctv.org/cameras/france/provence-alpes-cote-dazur/carces/carces-north-west-gros-bessillon-318313;Carces
+https://opencctv.org/cameras/france/provence-alpes-cote-dazur/martigues/carro-beach-martigues-356773;Martigues
+https://opencctv.org/cameras/france/provence-alpes-cote-dazur/cassis/cassis-entree-du-port-410134;Cassis
+https://opencctv.org/cameras/france/provence-alpes-cote-dazur/cassis/cote-dazur-cassis-le-cap-canaille-390865;Cassis
+https://opencctv.org/cameras/france/provence-alpes-cote-dazur/cassis/cote-dazur-cassis-le-port-390884;Cassis
+https://opencctv.org/cameras/france/provence-alpes-cote-dazur/cassis/cassis-panoramique-hd-455549;Cassis
+https://opencctv.org/cameras/france/provence-alpes-cote-dazur/cassis/cassis-north-west-313091;Cassis
+https://opencctv.org/cameras/france/provence-alpes-cote-dazur/cassis/cassis-north-port-de-cassis-420406;Cassis
+https://opencctv.org/cameras/france/provence-alpes-cote-dazur/cavalaire-sur-mer/cavalaire-sur-mer-panoramique-hd-390762;Cavalaire-sur-Mer
+https://opencctv.org/cameras/france/provence-alpes-cote-dazur/cavalaire-sur-mer/cavalaire-sur-mer-live-408422;Cavalaire-sur-Mer
+https://opencctv.org/cameras/france/provence-alpes-cote-dazur/ceillac/ceillac-312331;Ceillac
+https://opencctv.org/cameras/france/provence-alpes-cote-dazur/ceillac/ceillac-panoramique-hd-455483;Ceillac
+https://opencctv.org/cameras/france/provence-alpes-cote-dazur/ceillac/ceillac-site-nordique-454849;Ceillac
+https://opencctv.org/cameras/france/provence-alpes-cote-dazur/cervieres/cervieres-aire-de-jeux-455029;Cervières
+https://opencctv.org/cameras/france/provence-alpes-cote-dazur/cervieres/cervieres-panoramique-hd-455030;Cervières
+https://opencctv.org/cameras/france/provence-alpes-cote-dazur/cervieres/cervieres-plat-du-laus-455031;Cervières
+https://opencctv.org/cameras/france/provence-alpes-cote-dazur/cervieres/cervieres-route-du-col-de-lizoard-390961;Cervières
+https://opencctv.org/cameras/france/provence-alpes-cote-dazur/chateau-ville-vieille/chateau-ville-vieille-d947-128794;Chateau-Ville-Vieille
+https://opencctv.org/cameras/france/provence-alpes-cote-dazur/vars/vars-north-east-crevoux-360076;Vars
+https://opencctv.org/cameras/france/provence-alpes-cote-dazur/col-des-guerins/col-des-guerins-d219-128805;Col des Guerins
+https://opencctv.org/cameras/france/provence-alpes-cote-dazur/col-des-tourettes/col-des-tourettes-d26-128810;Col des Tourettes
+https://opencctv.org/cameras/france/provence-alpes-cote-dazur/col-du-collet/col-du-collet-d994-128809;Col du Collet
+https://opencctv.org/cameras/france/provence-alpes-cote-dazur/col-du-galibier/col-du-galibier-d902-128783;Col du Galibier
+https://opencctv.org/cameras/france/provence-alpes-cote-dazur/col-du-lautaret/col-du-lautaret-1-d1091-128821;Col du Lautaret
+https://opencctv.org/cameras/france/provence-alpes-cote-dazur/col-du-lautaret/col-du-lautaret-2-d1091-128822;Col du Lautaret
+https://opencctv.org/cameras/france/provence-alpes-cote-dazur/embrun/embrun-421526;Embrun
+
+# Source: fr.worldcam.eu (130 caméras, 6 pages)
+https://fr.worldcam.eu/webcams/europe/france/17838-abries-ristolas-lechalp;Abriès-Ristolas
+https://fr.worldcam.eu/webcams/europe/france/41403-aiguines-vue-panoramique;Aiguines
+https://fr.worldcam.eu/webcams/europe/france/40121-ancelle-station-de-ski;Ancelle
+https://fr.worldcam.eu/webcams/europe/france/19924-antibes-port-gallice;Antibes
+https://fr.worldcam.eu/webcams/europe/france/36449-antibes-circulation-routiere;Antibes
+https://fr.worldcam.eu/webcams/europe/france/37245-arvieux-vallee-dizoard;Arvieux
+https://fr.worldcam.eu/webcams/europe/france/40874-aubagne-place-de-leglise;Aubagne
+https://fr.worldcam.eu/webcams/europe/france/4763-bandol-port-de-plaisance;Bandol
+https://fr.worldcam.eu/webcams/europe/france/30115-barcelonnette-vue-panoramique;Barcelonnette
+https://fr.worldcam.eu/webcams/europe/france/5514-beaulieu-sur-mer;Beaulieu-sur-Mer
+https://fr.worldcam.eu/webcams/europe/france/17849-beaumont-du-ventoux-station-mont-serein;Beaumont-du-Ventoux
+https://fr.worldcam.eu/webcams/europe/france/36914-lagune-de-berre-parc-de-la-poudrerie;Lagune de Berre
+https://fr.worldcam.eu/webcams/europe/france/36459-beuil-touron;Beuil
+https://fr.worldcam.eu/webcams/europe/france/26247-bormes-les-mimosas-plusieurs-vues;Bormes-les-Mimosas
+https://fr.worldcam.eu/webcams/europe/france/20404-bras-vue-panoramique;Bras
+https://fr.worldcam.eu/webcams/europe/france/22009-cassis-port;Cassis
+https://fr.worldcam.eu/webcams/europe/france/37578-castellane-riviere-verdon;Castellane
+https://fr.worldcam.eu/webcams/europe/france/36455-castellet-les-sausses-enriez;Castellet-lès-Sausses
+https://fr.worldcam.eu/webcams/europe/france/19413-cavalaire-sur-mer-port-de-plaisance;Cavalaire-sur-Mer
+https://fr.worldcam.eu/webcams/europe/france/41080-ceillac-stade-de-biathlon;Ceillac
+https://fr.worldcam.eu/webcams/europe/france/40774-ceillac-queyras;Ceillac
+https://fr.worldcam.eu/webcams/europe/france/31990-cervieres-la-laus;Cervières
+https://fr.worldcam.eu/webcams/europe/france/33728-col-de-montgenevre-station-de-ski;Col de Montgenèvre
+https://fr.worldcam.eu/webcams/europe/france/33755-col-de-turini-ranch-de-turini;Col de Turini
+https://fr.worldcam.eu/webcams/europe/france/33422-col-du-galibier;Col du Galibier
+https://fr.worldcam.eu/webcams/europe/france/41404-cotignac-tours-sarrasines;Cotignac
+https://fr.worldcam.eu/webcams/europe/france/28031-embrun-plan-deau;Embrun
+https://fr.worldcam.eu/webcams/europe/france/36456-entraunes-estenc;Entraunes
+https://fr.worldcam.eu/webcams/europe/france/17832-gap-place-jean-marcellin;Gap
+https://fr.worldcam.eu/webcams/europe/france/18881-grambois-vue-sur-la-ville;Grambois
+https://fr.worldcam.eu/webcams/europe/france/17836-grasse-panoramic-view;Grasse
+https://fr.worldcam.eu/webcams/europe/france/31034-la-londe-les-maures-port-miramar;La Londe-les-Maures
+https://fr.worldcam.eu/webcams/europe/france/8705-la-motte-du-caire-gliding-club;La Motte-du-Caire
+https://fr.worldcam.eu/webcams/europe/france/20405-la-roque-esclapon-vue-sur-le-lachens;La Roque-Esclapon
+https://fr.worldcam.eu/webcams/europe/france/37762-la-seyne-sur-mer-port;La Seyne-sur-Mer
+https://fr.worldcam.eu/webcams/europe/france/12262-le-lavandou-cavaliere;Le Lavandou
+https://fr.worldcam.eu/webcams/europe/france/26800-le-lavandou-plage-centrale;Le Lavandou
+https://fr.worldcam.eu/webcams/europe/france/12187-le-lavandou-plage-daiguebelle;Le Lavandou
+https://fr.worldcam.eu/webcams/europe/france/12562-le-lavandou-plage-de-la-fossette;Le Lavandou
+https://fr.worldcam.eu/webcams/europe/france/26801-le-lavandou-plage-de-saint-clair;Le Lavandou
+https://fr.worldcam.eu/webcams/europe/france/26799-le-lavandou-front-de-mer;Le Lavandou
+https://fr.worldcam.eu/webcams/europe/france/29408-le-pradet-port-des-oursinieres;Le Pradet
+https://fr.worldcam.eu/webcams/europe/france/33317-les-orres-centre-station-1650;Les Orres
+https://fr.worldcam.eu/webcams/europe/france/33318-les-orres-les-cretes;Les Orres
+https://fr.worldcam.eu/webcams/europe/france/36458-malaussene-lable;Malaussène
+https://fr.worldcam.eu/webcams/europe/france/3542-mandelieu-la-napoule-port-la-napoule;Mandelieu-la-Napoule
+https://fr.worldcam.eu/webcams/europe/france/35656-menton-hotel-napoleon;Menton
+https://fr.worldcam.eu/webcams/europe/france/26649-menton-plage-des-sablettes;Menton
+https://fr.worldcam.eu/webcams/europe/france/30116-meolans-revel-riviere-ubaye;Méolans-Revel
+https://fr.worldcam.eu/webcams/europe/france/20406-mons-pays-de-fayence;Mons
+https://fr.worldcam.eu/webcams/europe/france/13163-nice-a8;Nice
+https://fr.worldcam.eu/webcams/europe/france/16364-nice-castel-beach-club;Nice
+https://fr.worldcam.eu/webcams/europe/france/34999-nice-port;Nice
+https://fr.worldcam.eu/webcams/europe/france/16365-nice-hotel-le-negresco;Nice
+https://fr.worldcam.eu/webcams/europe/france/1060-nice-la-promenade-du-paillon;Nice
+https://fr.worldcam.eu/webcams/europe/france/19858-nice-les-baumettes;Nice
+https://fr.worldcam.eu/webcams/europe/france/35969-nice-aeroport-de-nice-cote-dazur;Nice
+https://fr.worldcam.eu/webcams/europe/france/12559-nice-panorama;Nice
+https://fr.worldcam.eu/webcams/europe/france/12560-nice-plage-sud-ouest;Nice
+https://fr.worldcam.eu/webcams/europe/france/18443-nice-promenade-des-anglais;Nice
+https://fr.worldcam.eu/webcams/europe/france/41370-roquebrune-sur-argens-corniche-des-issambres;Roquebrune-sur-Argens
+https://fr.worldcam.eu/webcams/europe/france/28306-roubion-le-village-la-station;Roubion
+https://fr.worldcam.eu/webcams/europe/france/35478-saint-chaffrey-cafe-soleil;Saint-Chaffrey
+https://fr.worldcam.eu/webcams/europe/france/31305-saint-etienne-de-tinee;Saint-Étienne-de-Tinée
+https://fr.worldcam.eu/webcams/europe/france/5924-saint-laurent-du-var-port;Saint-Laurent-du-Var
+https://fr.worldcam.eu/webcams/europe/france/36109-saint-mandrier-sur-mer-port;Saint-Mandrier-sur-Mer
+https://fr.worldcam.eu/webcams/europe/france/32546-saint-marc-jaumegarde-conteneur-a-dechets;Saint-Marc-Jaumegarde
+https://fr.worldcam.eu/webcams/europe/france/41000-le-grand-luberon-en-direct;Le grand Luberon
+https://fr.worldcam.eu/webcams/europe/france/37685-saint-martin-vesubie-parc-alpha;Saint-Martin-Vésubie
+https://fr.worldcam.eu/webcams/europe/france/15878-saint-raphael-vieux-port-base-nautique-port-santa-lucia;Saint-Raphaël
+https://fr.worldcam.eu/webcams/europe/france/33727-saint-tropez-port;Saint-Tropez
+https://fr.worldcam.eu/webcams/europe/france/14833-saint-tropez-noreve;Saint-Tropez
+https://fr.worldcam.eu/webcams/europe/france/19861-saint-veran;Saint-Véran
+https://fr.worldcam.eu/webcams/europe/france/40115-sainte-maxime-luc-provensal-port-saint-tropez;Sainte-Maxime
+https://fr.worldcam.eu/webcams/europe/france/29929-saintes-maries-de-la-mer-plage-des-arenes;Saintes-Maries-de-la-Mer
+https://fr.worldcam.eu/webcams/europe/france/17834-sanary-sur-mer-marina;Sanary-sur-Mer
+https://fr.worldcam.eu/webcams/europe/france/27623-valdeblore-la-colmiane;Valdeblore
+https://fr.worldcam.eu/webcams/europe/france/19607-vallauris-port-de-golfe-juan;Vallauris
+https://fr.worldcam.eu/webcams/europe/france/4329-vars;Vars
+https://fr.worldcam.eu/webcams/europe/france/4496-villefranche-sur-mer;Villefranche-sur-Mer
+https://fr.worldcam.eu/webcams/europe/france/5906-villefranche-sur-mer-port-departemental-de-la-darse;Villefranche-sur-Mer
+https://fr.worldcam.eu/webcams/europe/france/41402-vinon-sur-verdon-riviere-verdon;Vinon-sur-Verdon
+
+# Source: france-webcams.fr (32 caméras par département PACA)
+https://france-webcams.fr/provence-alpes-cote-d-azur/05-hautes-alpes/1.1039-webcams-de-france-puy-saint-pierre.html;Puy-Saint-Pierre
+https://france-webcams.fr/provence-alpes-cote-d-azur/06-alpes-maritimes/1.520-webcam-de-france-nice.html;Nice
+https://france-webcams.fr/provence-alpes-cote-d-azur/06-alpes-maritimes/1.512-webcam-de-france-cannes.html;Cannes
+https://france-webcams.fr/provence-alpes-cote-d-azur/06-alpes-maritimes/1.527-webcam-de-france-menton.html;Menton
+https://france-webcams.fr/provence-alpes-cote-d-azur/06-alpes-maritimes/1.509-webcam-de-france-cannes.html;Cannes
+https://france-webcams.fr/provence-alpes-cote-d-azur/06-alpes-maritimes/1.526-webcam-de-france-menton.html;Menton
+https://france-webcams.fr/provence-alpes-cote-d-azur/06-alpes-maritimes/1.628-webcam-de-france-menton.html;Menton
+https://france-webcams.fr/provence-alpes-cote-d-azur/13-bouches-du-rhone/1.480-webcam-de-france-la-ciotat.html;La Ciotat
+https://france-webcams.fr/provence-alpes-cote-d-azur/13-bouches-du-rhone/1.482-webcam-de-france-cassis.html;Cassis
+https://france-webcams.fr/provence-alpes-cote-d-azur/13-bouches-du-rhone/1.481-webcam-de-france-la-ciotat.html;La Ciotat
+https://france-webcams.fr/provence-alpes-cote-d-azur/13-bouches-du-rhone/1.484-webcam-de-france-cassis.html;Cassis
+https://france-webcams.fr/provence-alpes-cote-d-azur/13-bouches-du-rhone/1.483-webcam-de-france-cassis.html;Cassis
+https://france-webcams.fr/provence-alpes-cote-d-azur/13-bouches-du-rhone/1.485-webcam-de-france-cassis.html;Cassis
+https://france-webcams.fr/provence-alpes-cote-d-azur/83-var/1.488-webcam-de-france-sanary-sur-mer.html;Sanary-sur-Mer
+https://france-webcams.fr/provence-alpes-cote-d-azur/83-var/1.503-webcam-de-france-le-lavandou.html;Le Lavandou
+https://france-webcams.fr/provence-alpes-cote-d-azur/83-var/1.496-webcam-de-france-le-lavandou.html;Le Lavandou
+https://france-webcams.fr/provence-alpes-cote-d-azur/83-var/1.497-webcam-de-france-le-lavandou.html;Le Lavandou
+https://france-webcams.fr/provence-alpes-cote-d-azur/83-var/1.499-webcam-de-france-le-lavandou.html;Le Lavandou
+https://france-webcams.fr/provence-alpes-cote-d-azur/83-var/1.501-webcam-de-france-le-lavandou.html;Le Lavandou
+
+# Source: YouTube (webcams live PACA)
+https://www.youtube.com/watch?v=z6BNMoj9Pyo;Cannes
+https://www.youtube.com/watch?v=asO_10T0k2k;Cannes
+https://www.youtube.com/watch?v=8cff6yAO9bw;Cannes
+https://www.youtube.com/live/tmktfJDQhvQ;Marseille
+https://www.youtube.com/watch?v=vnll1ShbVR0;Nice
+https://www.youtube.com/watch?v=4HQfTQSZYsw;Cannes
+https://www.youtube.com/watch?v=hoN9su9T-G4;Saint-Véran
+https://www.youtube.com/watch?v=f8VW9AaP8rk;Arvieux

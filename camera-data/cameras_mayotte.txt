@@ -1,0 +1,19 @@
+# Webcams publiques - MAYOTTE (collecte hackathon)
+# Format : URL;ville (une par ligne)
+# Sources explorees : opencctv.org, fr.worldcam.eu, france-webcams.fr,
+# monde-du-voyage.com, livepublicwebcams.com, YouTube, Windy, Windfinder,
+# WeatherBug, allosurf, airlive.net, skylinewebcams, webcamera24,
+# mairie Mamoudzou, prefecture Mayotte.
+#
+# Sources retournant 0 webcam Mayotte : opencctv.org (region absente),
+# france-webcams.fr (pas de section Outre-Mer), worldcam.eu France et
+# Afrique (pas de Mayotte), weatherbug.com (aucune caméra), windfinder
+# (aeroport Dzaoudzi + Mamoudzou : aucune), monde-du-voyage.com (0,
+# Mayotte et Dzaoudzi), allosurf (394 webcams, aucune Mayotte),
+# airlive.net (pas de Dzaoudzi/Mayotte), skylinewebcams/webcamera24 (rien),
+# mairie Mamoudzou (mamoudzou.yt, aucune), prefecture Mayotte
+# (mayotte.gouv.fr, aucune).
+
+https://www.windy.com/webcams/1611131647;Kani-Kéli
+https://www.youtube.com/watch?v=xG6n4nt4Ng0;Mamoudzou
+https://www.youtube.com/watch?v=hRBdOl9vGOI;Mamoudzou
