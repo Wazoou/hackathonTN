@@ -7,9 +7,9 @@ Run from the repository root:
 
     python ml/build_camera_directory.py
 
-The script reads camera-data/cameras.csv, geocodes each city through the public
-French Address API, and places the point in the risk-cell mesh. No API key is
-needed.
+The script reads camera-data/cameras.csv, uses supplied lat/lon coordinates or
+geocodes the city through the public French Address API, and places each point
+in the risk-cell mesh. No API key is needed.
 """
 from __future__ import annotations
 
@@ -121,7 +121,7 @@ def read_camera_csv(
     path: Path,
     *,
     output_fn: Callable[[str], None] = print,
-) -> list[dict[str, str]]:
+) -> list[dict[str, Any]]:
     """Read and validate URL/city rows from a comma- or semicolon-separated CSV."""
     if not path.is_file():
         raise FileNotFoundError(f"Fichier CSV introuvable : {path}")
@@ -144,7 +144,7 @@ def read_camera_csv(
             )
 
         seen_urls: set[str] = set()
-        cameras: list[dict[str, str]] = []
+        cameras: list[dict[str, Any]] = []
         for line_number, row in enumerate(reader, start=2):
             if None in row:
                 raise ValueError(f"Ligne {line_number} du CSV {path} : trop de colonnes.")
@@ -162,7 +162,15 @@ def read_camera_csv(
                 output_fn(f"Ligne {line_number} : lien déjà présent, ignoré ({url}).")
                 continue
             seen_urls.add(url)
-            cameras.append({"nom": city, "url_youtube": url})
+            camera: dict[str, Any] = {"nom": city, "url_youtube": url}
+            latitude = (row.get(columns.get("lat", "")) or "").strip()
+            longitude = (row.get(columns.get("lon", "")) or "").strip()
+            if latitude or longitude:
+                coordinates = valid_coordinates(latitude, longitude)
+                if coordinates is None:
+                    raise ValueError(f"Ligne {line_number} : coordonnées lat/lon invalides ou incomplètes.")
+                camera["lat"], camera["lon"] = coordinates
+            cameras.append(camera)
     return cameras
 
 
@@ -301,6 +309,10 @@ def build_directory(
     skipped_geocode: list[str] = []
     coordinates_by_city: dict[str, tuple[float, float] | None] = {}
     for camera in csv_cameras:
+        if "lat" in camera and "lon" in camera:
+            new_entries.append(camera)
+            output_fn(f"Coordonnées du CSV conservées pour « {camera['nom']} ».")
+            continue
         city_key = " ".join(camera["nom"].split()).casefold()
         if city_key not in coordinates_by_city:
             try:

@@ -200,6 +200,14 @@ chaque webcam dans une maille du maillage des risques. À chaque exécution, il 
 ligne se répercute sur la carte. Un CSV sans webcam vide aussi l’annuaire. Une connexion
 Internet est nécessaire pour géolocaliser les villes ; aucune clé YouTube n’est requise.
 
+Les colonnes optionnelles `lat` et `lon` permettent de conserver les coordonnées
+connues d'une caméra. Lorsqu'elles sont renseignées ensemble, le script les utilise
+directement, sans géocoder le nom. Le catalogue actuel conserve ainsi les positions
+validées, y compris plusieurs vues d'une même commune. Les coordonnées doivent être
+finies et valides en WGS84. Laisser les deux champs vides active le géocodage habituel.
+La provenance des ajouts pour la couverture nationale figure dans
+`camera-data/cameras.ajouts.csv` et `camera-data/COUVERTURE_CAMERAS.md`.
+
 Le dashboard lit le JSON depuis `camera-data` (également monté dans Docker) ; ouvrez
 **Webcam → Webcams**, puis cliquez sur un repère. Les URL YouTube, les images JPG/PNG
 (instantanés actualisés périodiquement), les vidéos et flux directs reconnus sont affichés

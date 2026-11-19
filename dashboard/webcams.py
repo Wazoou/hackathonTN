@@ -110,7 +110,7 @@ def live_webcams() -> None:
             initial_view_state=pdk.ViewState(
                 latitude=46.5,
                 longitude=2.2,
-                zoom=5,
+                zoom=4.6,
                 min_zoom=3,
                 max_zoom=15,
             ),

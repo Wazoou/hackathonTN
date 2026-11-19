@@ -98,6 +98,43 @@ class CameraDirectoryTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "URL de webcam et ville obligatoires"):
                 read_camera_csv(path)
 
+    def test_supplied_coordinates_preserve_distinct_camera_positions_without_geocoding(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            csv_path = root / "cameras.csv"
+            csv_path.write_text(
+                "url_youtube;ville;lat;lon\n"
+                "https://example.org/one.jpg;Même commune;0.25;0.25\n"
+                "https://example.org/two.jpg;Même commune;0.75;1.25\n",
+                encoding="utf-8",
+            )
+            mesh = gpd.GeoDataFrame(
+                {"cell_code": ["west", "east"], "geometry": [box(0, 0, 1, 1), box(1, 0, 2, 1)]},
+                crs="EPSG:4326",
+            )
+            mesh_path = root / "mesh.geojson"
+            mesh.to_file(mesh_path, driver="GeoJSON")
+            session = GeocodingSession()
+            result = build_directory(
+                mesh_path=mesh_path, id_column="cell_code", input_csv=csv_path,
+                output_json=root / "camera.json", output_fn=lambda _: None, session=session,
+            )
+            self.assertEqual(session.params, [])
+            self.assertEqual([c["id_maille"] for c in result], ["west", "east"])
+            self.assertEqual([(c["lat"], c["lon"]) for c in result], [(0.25, 0.25), (0.75, 1.25)])
+
+    def test_csv_rejects_incomplete_or_invalid_coordinates(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "cameras.csv"
+            for coordinates in ["48;", ";2", "nan;2", "91;2", "48;181", "bad;2"]:
+                with self.subTest(coordinates=coordinates):
+                    path.write_text(
+                        "url_youtube;ville;lat;lon\nhttps://example.org/live.jpg;Paris;" + coordinates + "\n",
+                        encoding="utf-8",
+                    )
+                    with self.assertRaisesRegex(ValueError, "coordonnées lat/lon"):
+                        read_camera_csv(path)
+
     def test_ambiguous_city_requires_a_department(self):
         session = GeocodingSession(
             [
