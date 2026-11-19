@@ -315,13 +315,12 @@ function initialize(data){
  });
  if(data.layers.p_feu)state.layer='p_feu'; // couche par défaut quand le modèle BDIFF est fourni
  try{Object.assign(state,JSON.parse(sessionStorage.getItem('risk-controls')||'{}'));}catch{}
- if(!rows.has(state.dept))state.dept='all';if(!data.layers[state.layer])state.layer='score';
- selectedDept=state.dept==='all'?null:state.dept;
+ // Department clicks select and zoom without filtering the national map.
+ // Discard filters saved by the former department dropdown.
+ state.dept='all';if(!data.layers[state.layer])state.layer='score';
+ selectedDept=null;
  if(!['multiplicatif','additif'].includes(state.mode))state.mode='multiplicatif';
  state.weight=Math.max(0,Math.min(20,Math.round(Number(state.weight)||0)));
- $('department').replaceChildren();
- for(const [v,label] of [['all','Tous les départements'],...data.departments.map(d=>[d,`${data.department_names[d]||'Département'} (${d})`])]){const o=new Option(label,v);$('department').add(o);}
- $('department').value=state.dept;$('department').disabled=false;
  renderLayerControls();
  $('layers').disabled=false;$('weight').value=state.weight;
  document.querySelectorAll('input[name=mode]').forEach(el=>{el.checked=el.value===state.mode;el.onchange=()=>{state.mode=el.value;update('mode');};});
@@ -346,8 +345,6 @@ function initialize(data){
   onError:fail});
  update();$('status').hidden=true;document.body.dataset.ready='true';document.body.dataset.loadCount=String(++loadCount);
 }
-$('department').onchange=()=>{state.dept=$('department').value;update('department');};
-$('explore-department').onclick=()=>{if(selectedDept){state.dept=selectedDept;$('department').value=state.dept;update('department');}};
 $('weight').oninput=()=>{state.weight=Number($('weight').value);schedule('weight');};
 $('fit').onclick=()=>fit();
 // Direct manipulation interrupts the flight immediately.

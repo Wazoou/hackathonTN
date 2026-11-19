@@ -58,8 +58,6 @@ output{font-variant-numeric:tabular-nums;font-weight:700;color:var(--accent-stro
 .hint{margin:6px 0 0}
 #department-details{border:1px solid #b9d4ea;background:#f6fafd;border-radius:var(--radius);padding:12px 14px;font-size:13px;line-height:1.6}
 #department-details ul{margin:5px 0 10px;padding-left:18px}
-#explore-department{margin-top:10px;width:100%;background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
-#explore-department:hover{background:var(--accent-strong);border-color:var(--accent-strong);color:#fff}
 .department-insights{border-top:1px solid var(--line);margin-top:10px;padding-top:10px}
 details.advanced{border-top:1px solid var(--line);padding-top:12px;margin-top:auto}
 details.advanced summary{cursor:pointer;font-size:13px;font-weight:600;color:var(--navy);list-style-position:outside}
@@ -100,10 +98,9 @@ table{width:100%;border-collapse:collapse;font-size:12px}td,th{padding:9px 7px;t
 <p class="muted" id="explanation"></p>
 </section><aside class="side card" aria-label="Réglages de la carte">
 <h2 class="panel-title">Explorer la carte</h2>
-<fieldset><label class="block" for="department">Département</label><select id="department" disabled></select><p class="muted hint">Survolez un département pour voir son nom, cliquez pour zoomer. Le détail des mailles de 2 km apparaît en zoomant.</p></fieldset>
+<p class="muted hint">Survolez un département pour voir son nom, cliquez pour zoomer. Le détail des mailles de 2 km apparaît en zoomant.</p>
 <section id="department-details" aria-label="Fiche du département" hidden>
 <div id="department-summary" aria-live="polite"></div>
-<button id="explore-department">Explorer ce département</button>
 </section>
 <fieldset id="layers" disabled><legend>Couche affichée</legend></fieldset>
 <details class="advanced"><summary>Réglages avancés du score expert</summary>
