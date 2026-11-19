@@ -78,9 +78,17 @@ class HttpSnapshotSource:
         self.url = url
 
     def read(self) -> Image.Image:
-        r = requests.get(self.url, timeout=15, headers={"User-Agent": "pyro-watch-hackathon"})
-        r.raise_for_status()
-        return Image.open(io.BytesIO(r.content)).convert("RGB")
+        with requests.get(self.url, timeout=(4, 10), stream=True,
+                          headers={"User-Agent": "pyro-watch-hackathon"}) as r:
+            r.raise_for_status()
+            if not r.headers.get("Content-Type", "").lower().startswith("image/"):
+                raise ValueError("Le diffuseur n’a pas renvoyé une image")
+            content = bytearray()
+            for chunk in r.iter_content(64 * 1024):
+                content.extend(chunk)
+                if len(content) > 8 * 1024 * 1024:
+                    raise ValueError("Image webcam trop volumineuse")
+        return Image.open(io.BytesIO(content)).convert("RGB")
 
 
 def make_source(spec: str, name: str, frame_step: int = 25):

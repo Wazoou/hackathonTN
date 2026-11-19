@@ -1,6 +1,6 @@
 # Pyro-Watch : docker compose up --build  ->  dashboard sur http://localhost:8501
-# Vrai modèle : mettre DETECTOR=yolo dans le fichier .env (voir .env.example)
-# Caméras : images réelles du dataset pyro-sdis, coordonnées approximatives (à ajuster).
+# webcam-monitor : vrai YOLO sur le catalogue public et la vidéo de démonstration.
+# Les anciens agents dummy sont optionnels : profil legacy-demo.
 
 x-camera: &camera
   build:
@@ -62,8 +62,30 @@ services:
       - ./ifm_plus/data/raw/meteo:/meteo-mf:ro,z
     restart: unless-stopped
 
+  webcam-monitor:
+    build:
+      context: ./camera
+      args:
+        INSTALL_YOLO: "true"
+    command: ["python", "-u", "monitor.py"]
+    environment:
+      API_URL: http://api:8000
+      CAMERAS_PATH: /camera-directory/cameras.csv
+      DEMO_VIDEO: /demo/depart-feu.mp4
+      WEBCAM_INTERVAL: ${WEBCAM_INTERVAL:-120}
+      DEMO_INTERVAL: ${DEMO_INTERVAL:-0.5}
+      YOLO_THREADS: ${YOLO_THREADS:-2}
+      YOLO_WEIGHTS: ${YOLO_WEIGHTS:-hf://pyronear/yolo11s_sensitive-detector/best.pt}
+    volumes:
+      - ./camera-data:/camera-directory:ro,z
+      - ./demo-media:/demo:ro,z
+      - ./.cache/hf:/root/.cache/huggingface:z
+    depends_on: [api]
+    restart: unless-stopped
+
   cam-1:
     <<: *camera
+    profiles: [legacy-demo]
     environment:
       <<: *camera-env
       CAMERA_ID: cam-1
@@ -74,6 +96,7 @@ services:
 
   cam-2:
     <<: *camera
+    profiles: [legacy-demo]
     environment:
       <<: *camera-env
       CAMERA_ID: cam-2
@@ -84,6 +107,7 @@ services:
 
   cam-3:
     <<: *camera
+    profiles: [legacy-demo]
     environment:
       <<: *camera-env
       CAMERA_ID: cam-3

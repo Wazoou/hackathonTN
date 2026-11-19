@@ -1,10 +1,11 @@
-"""Live webcam map and recorded archive views.
+"""Live webcam map and demonstration camera.
 
 Supports every kind of webcam source: YouTube live/recorded videos, periodic
 image URLs (JPG/PNG refreshed by the provider), HLS/MJPEG streams, etc.
 """
 
 import os
+import json
 import logging
 import time
 from pathlib import Path
@@ -16,7 +17,8 @@ import requests
 import streamlit as st
 import streamlit.components.v1 as components
 
-from archives import archives
+from surveillance import (DEMO_CAMERA, DEMO_URL, analysis_preview, camera_id,
+                          demo_controls, map_status, monitoring_status)
 from interface import section_title
 from webcam_directory import (
     WEBCAM_LAYER_ID,
@@ -34,6 +36,37 @@ LOGGER = logging.getLogger(__name__)
 # A custom style URL avoids Streamlit's fallback for tokenless Mapbox objects.
 # Its tiles match the risk, archives and history maps.
 OSM_MAP_STYLE = "app/static/openstreetmap.json"
+
+
+def _select_webcam() -> None:
+    """Consume a new map event, never replay an old selection on a button rerun."""
+    url = selected_camera_url(st.session_state.get("live_webcam_map", {}))
+    if url:
+        st.session_state["selected_webcam_url"] = url
+
+
+def _refresh_map_status() -> None:
+    monitoring_status.clear()
+    st.session_state.pop("webcam_map_snapshot", None)
+
+
+def _map_data(cameras) -> pd.DataFrame:
+    # Streamlit 1.45 includes the complete deck JSON in the widget identity.
+    # Freeze monitoring metadata until an explicit refresh, so a new inference
+    # cannot replace the widget and discard the click that triggered the rerun.
+    signature = json.dumps(cameras, sort_keys=True)
+    snapshot = st.session_state.get("webcam_map_snapshot")
+    if snapshot is None or snapshot["catalogue"] != signature:
+        states = monitoring_status()
+        rows = []
+        for camera in cameras:
+            url = camera["url_youtube"]
+            label, color = map_status(states.get(camera_id(url)))
+            rows.append({**camera, "analyse": label,
+                         "color": [194, 65, 12, 230] if url == DEMO_URL else color})
+        snapshot = {"catalogue": signature, "rows": rows}
+        st.session_state["webcam_map_snapshot"] = snapshot
+    return pd.DataFrame(snapshot["rows"])
 
 
 def _refreshed_image_url(url: str) -> str:
@@ -73,18 +106,23 @@ def live_webcams() -> None:
         st.info("L’annuaire ne contient aucune webcam.")
         return
 
+    cameras.append(dict(DEMO_CAMERA))
+
     section_title(
         "Webcams et flux vidéo",
         "Cliquez sur un repère pour afficher le flux correspondant",
     )
     st.caption(
-        f"{len(cameras)} webcam(s) géolocalisée(s) · "
+        f"{len(cameras) - 1} webcams publiques + 1 démonstration · "
         "La disponibilité du direct peut avoir changé depuis la génération de l’annuaire."
     )
 
     map_col, video_col = st.columns([1.25, 1], gap="large")
     with map_col:
-        data = pd.DataFrame(cameras)
+        st.button("Actualiser les états", key="refresh_webcam_states",
+                  on_click=_refresh_map_status,
+                  help="Actualise les couleurs de surveillance sans changer la webcam affichée.")
+        data = _map_data(cameras)
         deck = pdk.Deck(
             layers=[
                 pdk.Layer(
@@ -92,7 +130,7 @@ def live_webcams() -> None:
                     data,
                     id=WEBCAM_LAYER_ID,
                     get_position="[lon, lat]",
-                    get_fill_color=[0, 122, 204, 190],
+                    get_fill_color="color",
                     get_line_color=[255, 255, 255, 230],
                     get_line_width=2,
                     line_width_min_pixels=1,
@@ -109,22 +147,22 @@ def live_webcams() -> None:
                 min_zoom=3,
                 max_zoom=15,
             ),
-            tooltip={"text": "{nom}\nMaille de risque : {id_maille}"},
+            tooltip={"text": "{nom}\nMaille de risque : {id_maille}\n{analyse}"},
             map_provider="carto",
             map_style=OSM_MAP_STYLE,
         )
-        map_state = st.pydeck_chart(
+        st.pydeck_chart(
             deck,
             height=560,
-            on_select="rerun",
+            on_select=_select_webcam,
             selection_mode="single-object",
             key="live_webcam_map",
         )
+        st.caption("Bleu : analysée · Rouge : suspicion au dernier passage · "
+                   "Gris : en attente ou en échec · Orange : démonstration. "
+                   "Le bouton ci-dessus actualise ces états ; les images continuent à se rafraîchir.")
 
     camera_by_url = {camera["url_youtube"]: camera for camera in cameras}
-    selected_url = selected_camera_url(map_state)
-    if selected_url in camera_by_url:
-        st.session_state["selected_webcam_url"] = selected_url
     selected_url = st.session_state.get("selected_webcam_url")
     selected_camera = camera_by_url.get(selected_url)
 
@@ -134,6 +172,12 @@ def live_webcams() -> None:
             st.caption(f"Maille de risque : {selected_camera['id_maille']}")
 
             url = selected_camera["url_youtube"]
+            if url == DEMO_URL:
+                demo_controls("map_demo")
+                analysis_preview(camera_id(url))
+                return
+            with st.expander("Dernière analyse YOLO"):
+                analysis_preview(camera_id(url))
             display_type = webcam_display_type(url)
 
             if display_type == "youtube":
@@ -161,14 +205,4 @@ def live_webcams() -> None:
 
 
 def webcams() -> None:
-    view = st.radio(
-        "Contenu webcam",
-        ("Webcams", "Archives enregistrées"),
-        horizontal=True,
-        label_visibility="collapsed",
-        key="webcam_content_view",
-    )
-    if view == "Webcams":
-        live_webcams()
-    else:
-        archives()
+    live_webcams()

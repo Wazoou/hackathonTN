@@ -1,11 +1,13 @@
 """Thème, en-tête et éléments de mise en page partagés par toutes les vues."""
 from html import escape
 
+import requests
 import streamlit as st
 
 MODE_ARCHIVES = "Carte des archives"
 MODE_RISK_MAP = "Carte des risques"
 MODE_FIRE_HISTORY = "Historique des incendies"
+MODE_ALERTS = "Alertes de fumée"
 MODE_KEY = "app_mode"
 
 # Onglets : (mode, clé du bouton, libellé, icône, titre de page, description)
@@ -15,9 +17,13 @@ PAGES = [
      "Risque du jour calculé à partir du terrain et de la météo, consultable en archives, "
      "en direct ou en prévision. Cliquez un département pour l’explorer."),
     (MODE_ARCHIVES, "mode_archives", "Webcams", ":material/videocam:",
-     "Webcams et archives",
-     "Consultez les vues de webcams publiques sur la carte ou rejouez des séquences "
-     "archivées autour d’épisodes d’incendie, de panache ou de nuages."),
+     "Webcams en direct",
+     "Explorez les webcams publiques sur la carte, consultez leurs images et les "
+     "dernières analyses de fumée par YOLO."),
+    (MODE_ALERTS, "mode_alerts", "Alertes", ":material/notifications_active:",
+     "Détections de fumée",
+     "Images analysées par YOLO : vérifiez les détections et qualifiez les alertes. "
+     "La caméra de démonstration est identifiée séparément."),
     (MODE_FIRE_HISTORY, "mode_fire_history", "Historique", ":material/history:",
      "Incendies passés",
      "Feux recensés par la BDIFF en France métropolitaine, filtrables par année, mois, "
@@ -391,11 +397,41 @@ def apply_theme():
     </style>""", unsafe_allow_html=True)
 
 
+@st.fragment(run_every="5s")
+def _alert_nav_button(mode):
+    from surveillance import api
+
+    try:
+        count = max(0, int(api("GET", "/stats")["open_yolo_alerts"]))
+    except (requests.RequestException, ValueError, KeyError):
+        count = 0
+    badge = str(count) if count < 100 else "99+"
+    content = f"'{badge}'" if count else "none"
+    st.markdown(f"""<style>
+        .st-key-mode_alerts button {{ position: relative; }}
+        .st-key-mode_alerts button::after {{
+            content: {content}; position: absolute; top: 1px; right: 3px;
+            min-width: 18px; height: 18px; padding: 0 4px; box-sizing: border-box;
+            display: flex; align-items: center; justify-content: center;
+            border-radius: 999px; background: #dc2626; color: white;
+            font: 700 10px/1 system-ui, sans-serif;
+            box-shadow: 0 0 0 2px #fff, 0 2px 4px rgb(153 27 27 / 18%);
+            pointer-events: none;
+        }}
+        .st-key-nav_bar [data-testid="stElementContainer"]:has(style) {{ display: none; }}
+    </style>""", unsafe_allow_html=True)
+    if st.button("Alertes", key="mode_alerts", icon=":material/notifications_active:",
+                 type="primary" if mode == MODE_ALERTS else "secondary",
+                 help=f"{count} alerte(s) YOLO à vérifier",
+                 on_click=_set_mode, args=(MODE_ALERTS,), use_container_width=True):
+        st.rerun()
+
+
 def header():
     """Affiche la marque et les onglets de navigation."""
     mode = current_mode()
     with st.container(key="topbar"):
-        brand_col, nav_col = st.columns([1.5, 1], vertical_alignment="center")
+        brand_col, nav_col = st.columns([1.2, 1], vertical_alignment="center")
         brand_col.markdown(
             f'''<div class="brand"><span class="brand-mark">{FLAME_SVG}</span>
                 <div><h1>Pyro<span>-Watch</span></h1>
@@ -403,7 +439,11 @@ def header():
             unsafe_allow_html=True,
         )
         with nav_col, st.container(key="nav_bar"):
-            for col, (page_mode, key, label, icon, *_) in zip(st.columns(3), PAGES):
+            for col, (page_mode, key, label, icon, *_) in zip(st.columns(len(PAGES)), PAGES):
+                if page_mode == MODE_ALERTS:
+                    with col:
+                        _alert_nav_button(mode)
+                    continue
                 col.button(
                     label,
                     key=key,

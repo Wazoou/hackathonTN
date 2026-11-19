@@ -1,4 +1,4 @@
-"""Parcours commun sur les vrais manifestes, dans le conteneur dashboard."""
+"""Vérification isolée de l’ancien lecteur, retiré de la navigation de l’application."""
 import json
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -8,12 +8,8 @@ from streamlit.testing.v1 import AppTest
 pyro = json.loads(Path("/archives/manifest.json").read_text())
 webcams = json.loads(Path("/archives/manifest-webcams.json").read_text())
 with patch("timeline_gauge.render", return_value=None) as gauge:
-    at = AppTest.from_file("/app/app.py", default_timeout=30).run()
+    at = AppTest.from_string("from archives import archives\narchives()", default_timeout=30).run()
     assert not at.exception, at.exception
-    at.button(key="mode_archives").click().run()
-    at.radio(key="webcam_content_view").set_value("Archives enregistrées").run()
-    assert not at.exception, at.exception
-    assert "app_mode" not in at.session_state or at.session_state["app_mode"] == "Carte des archives"
     assert at.selectbox(key="archive_source").value == "all"
     assert len(gauge.call_args.args[5]) == 10
     assert len(gauge.call_args.args[6]) == len(pyro["frames"]) + len(webcams["frames"])
@@ -101,15 +97,4 @@ with patch("timeline_gauge.render", return_value=None) as gauge:
     assert at.session_state["replay_index"] == 6
     next(b for b in at.button if b.label == "← Précédente").click().run()
     assert at.session_state["replay_index"] == 5
-    at.button(key="mode_archives").click().run()
-    assert not at.exception, at.exception
-    assert at.session_state["app_mode"] == "Carte des archives"
-    at.button(key="mode_fire_history").click().run()
-    assert not at.exception, at.exception
-    assert not at.metric
-    assert not at.radio
-    assert not at.slider and not at.select_slider
-    assert len(at.get('iframe')) == 1  # Filters now live inside the persistent map.
-    at.button(key="mode_archives").click().run()
-    assert not at.exception, at.exception
-    print("Période vide, lecture et historique des incendies : OK")
+    print("Ancien lecteur isolé : période vide et lecture OK")

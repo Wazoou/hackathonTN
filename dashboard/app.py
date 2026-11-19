@@ -1,8 +1,9 @@
-"""Dashboard Pyro-Watch : carte des risques, archives webcam, historique des incendies."""
+"""Dashboard Pyro-Watch : risques, webcams, alertes et historique des incendies."""
 
 import streamlit as st
 from interface import (
     MODE_ARCHIVES,
+    MODE_ALERTS,
     MODE_FIRE_HISTORY,
     MODE_RISK_MAP,
     apply_theme,
@@ -24,6 +25,9 @@ if mode == MODE_RISK_MAP:
 elif mode == MODE_ARCHIVES:
     from webcams import webcams
     webcams()
+elif mode == MODE_ALERTS:
+    from alerts import alerts
+    alerts()
 elif mode == MODE_FIRE_HISTORY:
     from fire_history import render_fire_history
     render_fire_history()

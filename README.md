@@ -186,12 +186,16 @@ Vérification du parcours après import :
 
 ## Catalogue de webcams publiques
 
-L'onglet **Webcams** réunit le catalogue de 105 vues publiques et les
-**Archives enregistrées**. Le fond OpenStreetMap correspond à celui des autres
+L’onglet **Webcams** affiche directement la carte des 105 vues publiques et la
+caméra de démonstration, avec leurs analyses YOLO. Le premier prototype de replay
+d’archives a été retiré de cet onglet. Le fond OpenStreetMap correspond aux autres
 cartes. Le catalogue conserve des vues sur la végétation, les vallées et des
 horizons ruraux dans les 13 régions métropolitaines. Les images périodiques,
 YouTube et les flux vidéo reconnus disposent de leur lecteur respectif.
-Le modèle YOLO n'est pas connecté à ce catalogue.
+Le service `webcam-monitor` analyse les instantanés JPG de ce catalogue avec YOLO Pyronear.
+L’onglet **Alertes** présente les suspicions de fumée et leur qualification humaine.
+Sur la carte, **Actualiser les états** met à jour les couleurs de surveillance.
+Les images se rafraîchissent indépendamment, sans réinitialiser la carte ni sa sélection.
 
 Le dashboard lit directement le fichier versionné `camera-data/cameras.csv`,
 monté en lecture seule dans Docker. Aucun JSON local, géocodage ou téléchargement
@@ -484,13 +488,53 @@ Si ce dossier est absent, l’interface explique qu’aucune archive n’est imp
 Les scripts d’import ci-dessus permettent de reconstruire les données depuis les sources,
 mais l’archive partagée conserve exactement l’échantillon et les repères de la présentation.
 
-Pour lancer aussi les agents et la **surveillance simulée**, on peut préparer leurs images :
+### Surveillance YOLO et démonstration
+
+```bash
+docker compose up --build -d api dashboard webcam-monitor
+```
+
+Le premier build installe PyTorch CPU ; les poids Pyronear sont téléchargés puis
+conservés dans `.cache/hf/`. Un modèle unique analyse les 105 webcams, avec quatre
+téléchargements bornés en parallèle. `WEBCAM_INTERVAL=120` fixe l’intervalle minimum
+entre deux collectes par webcam ; un tour peut être plus long selon les sources et
+la machine. `YOLO_THREADS=2` borne les threads de calcul. Les échecs de source sont
+visibles dans Alertes, et ne créent pas de détections. Le diffuseur peut fournir une
+image ancienne même si sa collecte réussit : « analysée récemment » décrit notre
+analyse, pas la fraîcheur garantie de la prise de vue.
+
+Deux images distinctes consécutives à un score d’au moins 0,35 créent une alerte.
+Récupérer deux fois le même instantané public figé ne confirme pas une détection. Une alerte
+ouverte est enrichie avec l’image au meilleur score, sans doublon. Après qualification,
+un délai de 300 secondes depuis sa création limite les nouvelles alertes. La liste et la pastille ne retiennent que l’alerte la plus récente de chaque caméra,
+y compris avant l’application des filtres de statut. Les statuts
+**Confirmée / Fausse alerte** sont conservés dans SQLite. Les anciens résultats des
+agents factices ne sont pas affichés dans ce nouvel onglet.
+
+La caméra **Mimizan · Démonstration** est un repère orange près de Mimizan (Landes),
+à une position illustrative. Elle utilise `demo-media/depart-feu.mp4`, copie de la
+vidéo fournie « Design sans titre.mp4 ». Cette position ne décrit pas le lieu réel
+filmé. Dans **Alertes** ou sur son repère webcam, **Lancer la démo** lit la vidéo en
+boucle et analyse ses images avec le même modèle ; aucune détection n’est inventée.
+`DEMO_INTERVAL=0.5` donne priorité à la démo. L’aperçu affiche les images analysées,
+synchronisées avec les détections, et non un lecteur indépendant. Sur la vidéo fournie,
+la fumée est détectée notamment autour de 9–10 secondes ; le délai d’alerte dépend
+de l’échantillonnage et du CPU. **Relancer** revient au début et efface les anciennes
+alertes de démo. **Réinitialiser** fait de même en laissant la démo arrêtée. Ces deux
+actions ne touchent jamais aux alertes des webcams publiques.
+
+La carte de risque et les archives enregistrées restent indépendantes du détecteur.
+Un score YOLO n’est pas une probabilité d’incendie ni une validation opérationnelle.
+
+### Anciens agents de simulation (optionnels)
+
+Pour lancer aussi les anciens agents de **surveillance simulée**, préparer leurs images :
 
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install pyarrow requests
 .venv/bin/python ml/pyro_sdis.py samples --out data/samples --cameras 3
-docker compose up --build -d
+docker compose --profile legacy-demo up --build -d cam-1 cam-2 cam-3
 ```
 
 `data/samples/` alimente les agents ; `archives-data/` alimente la carte historique.
@@ -510,7 +554,7 @@ Le modèle Pyronear (`hf://pyronear/yolo11s_sensitive-detector/best.pt`) est té
 lancement dans `.cache/hf/`. Pour en utiliser un autre (après fine-tuning), changer `YOLO_WEIGHTS`
 dans `.env`.
 
-Vérifier que ça marche : `docker compose logs -f cam-1` doit afficher `Détecteur=YoloDetector`.
+Pour les agents historiques seulement : `docker compose --profile legacy-demo up --build -d cam-1 cam-2 cam-3`, puis vérifier `docker compose logs -f cam-1`. Le service `webcam-monitor` utilise toujours le vrai modèle, indépendamment de `DETECTOR`.
 
 ### Développement sans Docker
 
