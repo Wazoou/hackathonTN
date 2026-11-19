@@ -513,12 +513,13 @@ ouverte est enrichie avec l’image au meilleur score, sans doublon. Après qual
 un délai de 300 secondes depuis sa création limite les nouvelles alertes. La liste et la pastille ne retiennent que l’alerte la plus récente de chaque caméra,
 y compris avant l’application des filtres de statut. Les statuts
 **Confirmée / Fausse alerte** sont conservés dans SQLite. Les anciens résultats des
-agents factices ne sont pas affichés dans ce nouvel onglet.
+agents factices ne sont pas affichés dans ce nouvel onglet. Le filtre d’état se choisit
+avec les boutons **Tous / À vérifier / Confirmée / Fausse alerte**.
 
 La caméra **Mimizan · Démonstration** est un repère orange près de Mimizan (Landes),
 à une position illustrative. Elle utilise `demo-media/depart-feu.mp4`, copie de la
 vidéo fournie « Design sans titre.mp4 ». Cette position ne décrit pas le lieu réel
-filmé. Dans **Alertes** ou sur son repère webcam, **Lancer la démo** lit la vidéo en
+filmé. Dans l’onglet **Webcam**, sélectionnez son repère puis **Lancer la démo** lit la vidéo en
 boucle et analyse ses images avec le même modèle ; aucune détection n’est inventée.
 `DEMO_INTERVAL=0.5` donne priorité à la démo. L’aperçu affiche les images analysées,
 synchronisées avec les détections, et non un lecteur indépendant. Sur la vidéo fournie,

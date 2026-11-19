@@ -3,29 +3,34 @@ import requests
 import streamlit as st
 
 from interface import MODE_ARCHIVES, MODE_KEY, section_title
-from surveillance import (DEMO_ID, DEMO_URL, analysis_preview, api, date_label,
-                          demo_controls, frame_image)
+from surveillance import DEMO_URL, api, date_label, frame_image
 
 STATUS = {"open": "À vérifier", "confirmed": "Confirmée", "false_positive": "Fausse alerte"}
+FILTERS = ["Tous", *STATUS.values()]
+FILTER_KEY = "alerts_status_filter"
+
+
+def _set_alert_filter(status):
+    st.session_state[FILTER_KEY] = status
 
 
 def alerts():
-    with st.expander("Caméra de démonstration · Mimizan", expanded=False):
-        controls, preview = st.columns([1, 1.3])
-        with controls:
-            demo_controls("alerts_demo")
-        with preview:
-            analysis_preview(DEMO_ID)
     st.caption("Une alerte exige au moins deux analyses consécutives au-dessus du seuil. "
                "Le score du modèle ne constitue pas une confirmation d’incendie.")
-    left, right = st.columns(2)
-    status = left.selectbox("État des alertes", ["Tous", *STATUS.values()])
-    source = right.selectbox("Origine", ["Toutes", "Webcams publiques", "Démonstration"])
-    alert_feed(status, source)
+    if FILTER_KEY not in st.session_state:
+        st.session_state[FILTER_KEY] = "Tous"
+    status = st.session_state[FILTER_KEY]
+    with st.container(key="alert_status_bar"):
+        for index, (column, label) in enumerate(zip(st.columns(len(FILTERS)), FILTERS)):
+            column.button(label, key=f"alert_status_{index}",
+                          type="primary" if status == label else "secondary",
+                          on_click=_set_alert_filter, args=(label,),
+                          use_container_width=True)
+    alert_feed(status)
 
 
 @st.fragment(run_every="5s")
-def alert_feed(status, source):
+def alert_feed(status):
     try:
         cameras = [c for c in api("GET", "/cameras") if c.get("detector") == "yolo"]
         # Exclude the old synthetic/dummy agents from genuine detection results.
@@ -45,8 +50,6 @@ def alert_feed(status, source):
                 st.write(f"{camera['name']} · {camera['last_error']}")
     if status != "Tous":
         items = [a for a in items if STATUS[a["status"]] == status]
-    if source != "Toutes":
-        items = [a for a in items if bool(a["is_demo"]) == (source == "Démonstration")]
     section_title("Alertes de fumée", "La plus récente par caméra · actualisation toutes les 5 secondes")
     if not items:
         st.info("Aucune alerte pour cette sélection. La surveillance continue en arrière-plan.")

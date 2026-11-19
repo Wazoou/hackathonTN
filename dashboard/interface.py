@@ -157,6 +157,36 @@ def apply_theme():
       border-color: var(--accent-strong);
       color: #ffffff;
     }
+    [class*="st-key-camera_alert_"] [data-testid^="stBaseButton-"] {
+      background: #526e8a;
+      border-color: #526e8a;
+      color: #ffffff;
+    }
+    [class*="st-key-camera_alert_"] [data-testid^="stBaseButton-"]:hover {
+      background: #435d77;
+      border-color: #435d77;
+      color: #ffffff;
+    }
+    [class*="st-key-confirmed_"] [data-testid^="stBaseButton-"] {
+      background: #52785f;
+      border-color: #52785f;
+      color: #ffffff;
+    }
+    [class*="st-key-confirmed_"] [data-testid^="stBaseButton-"]:hover {
+      background: #42624d;
+      border-color: #42624d;
+      color: #ffffff;
+    }
+    [class*="st-key-false_positive_"] [data-testid^="stBaseButton-"] {
+      background: #95605f;
+      border-color: #95605f;
+      color: #ffffff;
+    }
+    [class*="st-key-false_positive_"] [data-testid^="stBaseButton-"]:hover {
+      background: #7d4f4f;
+      border-color: #7d4f4f;
+      color: #ffffff;
+    }
     button:focus-visible {
       outline: 2px solid var(--accent);
       outline-offset: 2px;
@@ -228,16 +258,17 @@ def apply_theme():
       color: var(--muted);
       line-height: 1.2;
     }
-    .st-key-nav_bar {
+    .st-key-nav_bar, .st-key-alert_status_bar {
       background: var(--surface-alt);
       border: 1px solid var(--line);
       border-radius: 10px;
       padding: 4px;
     }
-    .st-key-nav_bar [data-testid="stHorizontalBlock"] {
+    .st-key-nav_bar [data-testid="stHorizontalBlock"],
+    .st-key-alert_status_bar [data-testid="stHorizontalBlock"] {
       gap: 4px;
     }
-    .st-key-nav_bar button {
+    .st-key-nav_bar button, .st-key-alert_status_bar button {
       width: 100%;
       min-height: 38px;
       border: 0;
@@ -248,13 +279,16 @@ def apply_theme():
       font-weight: 600;
       white-space: nowrap;
     }
-    .st-key-nav_bar [data-testid="stBaseButton-secondary"]:hover {
+    .st-key-nav_bar [data-testid="stBaseButton-secondary"]:hover,
+    .st-key-alert_status_bar [data-testid="stBaseButton-secondary"]:hover {
       background: #e3e9ef;
       color: var(--navy);
       border: 0;
     }
     .st-key-nav_bar [data-testid="stBaseButton-primary"],
-    .st-key-nav_bar [data-testid="stBaseButton-primary"]:hover {
+    .st-key-nav_bar [data-testid="stBaseButton-primary"]:hover,
+    .st-key-alert_status_bar [data-testid="stBaseButton-primary"],
+    .st-key-alert_status_bar [data-testid="stBaseButton-primary"]:hover {
       background: var(--surface);
       color: var(--accent-strong);
       border: 0;
@@ -368,25 +402,28 @@ def apply_theme():
       .st-key-topbar {
         position: static;
       }
-      .st-key-nav_bar [data-testid="stHorizontalBlock"] {
+      .st-key-nav_bar [data-testid="stHorizontalBlock"],
+      .st-key-alert_status_bar [data-testid="stHorizontalBlock"] {
         flex-wrap: nowrap;
       }
-      .st-key-nav_bar [data-testid="stColumn"] {
+      .st-key-nav_bar [data-testid="stColumn"],
+      .st-key-alert_status_bar [data-testid="stColumn"] {
         min-width: 0;
         width: auto !important;
         flex: 1 1 0 !important;
       }
-      .st-key-nav_bar button {
+      .st-key-nav_bar button, .st-key-alert_status_bar button {
         padding: 4px 6px;
         line-height: 1.2;
       }
-      .st-key-nav_bar button [data-testid="stIconMaterial"] {
+      .st-key-nav_bar button [data-testid="stIconMaterial"],
+      .st-key-alert_status_bar button [data-testid="stIconMaterial"] {
         display: none;
       }
       .brand p {
         display: none;
       }
-      .st-key-nav_bar button {
+      .st-key-nav_bar button, .st-key-alert_status_bar button {
         font-size: 13px;
         white-space: nowrap;
       }
