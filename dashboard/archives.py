@@ -180,7 +180,8 @@ def archives():
         by_camera = {}
         for frame in frames:
             by_camera.setdefault(frame["camera_id"], []).append(frame)
-        with st.popover("Choisir la caméra / la séquence", use_container_width=True):
+        title_slot = st.container()
+        with st.popover("Changer de caméra ou de séquence", icon=":material/tune:", use_container_width=True):
             point_id = st.selectbox("Point de la carte", list(points), format_func=lambda key: points[key]["name"],
                                     key="archive_point", on_change=stop_playback)
             cameras = [key for key in by_camera if collection["cameras"][key]["point_id"] == point_id]
@@ -203,7 +204,7 @@ def archives():
             show_boxes = st.checkbox("Afficher les annotations de référence (fumée)", value=True, key="archive_boxes") if collection["cameras"][camera]["source_key"] == "pyro" else False
         point = points[point_id]
         webcam = point["source_key"] == "webcams"
-        st.markdown(f'<div class="reader-source">{SOURCE_LABELS[point["source_key"]]} · ARCHIVE</div>'
+        title_slot.markdown(f'<div class="reader-source">{SOURCE_LABELS[point["source_key"]]} · ARCHIVE</div>'
                     f'<div class="reader-title">{escape(collection["cameras"][camera]["name"])}</div>', unsafe_allow_html=True)
         current = frames_in_window(by_camera[camera], cursor, timedelta(seconds=width))
         if not current or not period:
@@ -282,13 +283,14 @@ def player(sequence, show_boxes, camera_meta=None):
         st.select_slider("Position dans la séquence", options=list(range(count)), key="replay_index",
                          format_func=lambda i: sequence[i]["time"].strftime("%d/%m %H:%M" if camera_meta else "%H:%M:%S"),
                          on_change=stop_playback)
-    st.caption("Lecture à 1 image/s · le temps réel entre les prises de vue peut varier.")
-    st.caption(camera_meta["credit"] if camera_meta else f"Source : {frame.get('original_camera_id', frame['camera_id'])} · split {frame.get('split', 'non renseigné')}")
-    if camera_meta:
-        st.caption(frame["time_basis"])
-        st.markdown(f"[Ouvrir l’image source]({frame['source_url']})")
+    playback = "Lecture à 1 image/s"
     if index:
-        delta = frame["time"] - sequence[index - 1]["time"]
-        st.caption(f"Intervalle réel depuis l’image précédente : {delta.total_seconds():g} secondes.")
+        delta = (frame["time"] - sequence[index - 1]["time"]).total_seconds()
+        playback += f" · {delta / 60:g} min depuis l’image précédente" if delta >= 60 else f" · {delta:g} s depuis l’image précédente"
+    st.caption(playback)
     st.caption("Image non annotée · YOLO à connecter" if camera_meta else
                ("Fumée annotée" if frame["boxes"] else "Aucune fumée annotée sur cette image"))
+    if camera_meta:
+        st.caption(f"{camera_meta['credit']} · {frame['time_basis']} · [Ouvrir l’image source]({frame['source_url']})")
+    else:
+        st.caption(f"Source : {frame.get('original_camera_id', frame['camera_id'])} · split {frame.get('split', 'non renseigné')}")

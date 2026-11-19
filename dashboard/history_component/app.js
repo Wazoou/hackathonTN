@@ -25,11 +25,11 @@ function render(){
  for(const key of active)if(!next.has(key)){map.removeLayer(markers.get(key));active.delete(key);}
  for(const p of result.points){
   let marker=markers.get(p.key);
-  if(!marker){marker=L.circleMarker([p.latitude,p.longitude],{renderer,radius:p.radius_px,color:'#7d0a14',weight:1,fillColor:'#cd232d',fillOpacity:.75});marker.bindTooltip(()=>tooltip(marker.fireData));markers.set(p.key,marker);}
+  if(!marker){marker=L.circleMarker([p.latitude,p.longitude],{renderer,radius:p.radius_px,color:'#7d0a14',weight:1,fillColor:'#dc2626',fillOpacity:.6});marker.bindTooltip(()=>tooltip(marker.fireData));markers.set(p.key,marker);}
   marker.fireData=p;marker.setRadius(p.radius_px);marker.closeTooltip();
   if(!active.has(p.key)){marker.addTo(map);active.add(p.key);}
  }
- $('count').textContent=`${fmt(result.count)} incendies correspondant à la sélection`;$('empty').hidden=result.count!==0;
+ $('count').textContent=`${fmt(result.count)} incendie${result.count>1?'s':''} · ${state.period==='month'?months[state.month-1]+' '+state.year:state.year}`;$('empty').hidden=result.count!==0;
  $('approximate').textContent=result.approximate?`${fmt(result.approximate)} incendies positionnés au centre de leur département faute de commune localisée.`:'';
  $('unmapped').textContent=result.unmapped?`${fmt(result.unmapped)} incendies sans coordonnées ne sont pas représentés sur la carte.`:'';
  document.body.dataset.year=state.year;document.body.dataset.count=result.count;document.body.dataset.markers=next.size;
