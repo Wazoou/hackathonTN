@@ -61,6 +61,16 @@ context.input={key:'2022-07-15',label:'2022-07-15',revision:'new-forecast',kind:
 run('applyDaily(input)');assert.equal(run('stats("33").median'),8);
 assert.equal(run('daily.kind'),'forecast');assert.equal(run('view'),originalView);
 assert.equal(run('selectedDept'),'33');assert.equal(run('loadCount'),1);
+assert.match(run('explanationHTML()'),/<strong>Évaluation du risque journalier du 15\/07\/2022 :<\/strong>/);
+assert.match(run('explanationHTML()'),/caractéristiques du territoire .* prévisions météorologiques issues d’Open-Meteo/);
+assert.match(run('explanationHTML()'),/incertitude croissante avec l’échéance/);
+assert.doesNotMatch(run('explanationHTML()'),/Les probabilités communales sont réparties entre les mailles/);
+run("state.layer='p_feu'");
+assert.match(run('explanationHTML()'),/^<strong>Probabilité annuelle d’incendie :<\/strong> probabilité estimée à partir des feux historiques BDIFF/);
+assert.match(run('explanationHTML()'),/facteurs naturels \(forêt, résineux, lisières, pente et pins\) et facteurs humains \(habitat proche de la végétation, routes, trafic routier et agriculture\)/);
+run("state.layer='score'");
+assert.match(run('explanationHTML()'),/^<strong>Indice de sensibilité territoriale :<\/strong> score expert de sensibilité du territoire, calculé en combinant les facteurs naturels \(forêt, résineux, lisières, pente et pins\) et les facteurs humains \(habitat proche de la végétation, routes, trafic routier et agriculture\)\. C’est un score, pas une probabilité de feu\./);
+run("state.layer='p_jour'");
 context.input={key:'wrong',values:pack([5]),fwi:null};
 assert.throws(()=>run('applyDaily(input)'),/incompatibles/);
 run('applyDaily(null)');

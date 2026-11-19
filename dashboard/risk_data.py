@@ -4,8 +4,10 @@
 CLASSES = [(0, "Très faible", (255, 255, 204)), (20, "Faible", (254, 217, 118)),
            (40, "Modéré", (253, 141, 60)), (60, "Élevé", (227, 26, 28)),
            (80, "Très élevé", (128, 0, 38))]
-LAYERS = {"p_feu": "Probabilité annuelle de départ (BDIFF)", "score": "Score de risque (expert)",
-          "s_combustible": "Combustible et relief", "s_humain": "Pression humaine"}
+LAYERS = {"p_feu": "Probabilité annuelle d’incendie",
+          "score": "Indice de sensibilité territoriale",
+          "s_combustible": "Caractéristiques du milieu naturel",
+          "s_humain": "Facteurs d’influence humaine"}
 # Bornes des classes pour la probabilité (% par an et par carreau), alignées sur CLASSES.
 PROBA_BOUNDS = [0, 2, 5, 10, 20, 40]
 

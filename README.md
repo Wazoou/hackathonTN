@@ -245,10 +245,10 @@ et pression humaine (BD TOPO, trafic, RPG). Le volet est **statique** : aucune c
 
 | Couche | Contenu |
 |---|---|
-| **Probabilité annuelle de départ (BDIFF)** | Probabilité qu’au moins un feu de forêt démarre dans l’année dans le carreau, apprise sur l’historique BDIFF (France : médiane 0,9 %, 90 % des mailles sous 4,3 %, maximum 32 % à Lacanau). Couche affichée par défaut quand elle est disponible. Classes : < 2 %, 2–5 %, 5–10 %, 10–20 %, ≥ 20 %. |
-| **Score de risque (expert)** | Score 0–100 à poids fixés à dire d’expert, combinaison multiplicative ou additive réglable. |
-| **Combustible et relief** | Sous-score 0–100 : résineux 40 %, forêt 25 %, lisières 15 %, pente 10 %, pins 10 %. |
-| **Pression humaine** | Sous-score 0–100 : habitat à moins de 200 m de la forêt (WUI) 40 %, routes pondérées 25 %, trafic 20 %, agriculture 15 %. |
+| **Probabilité annuelle d’incendie** | Probabilité qu’au moins un feu de forêt démarre dans l’année dans le carreau, apprise sur l’historique BDIFF (France : médiane 0,9 %, 90 % des mailles sous 4,3 %, maximum 32 % à Lacanau). Couche affichée par défaut quand elle est disponible. Classes : < 2 %, 2–5 %, 5–10 %, 10–20 %, ≥ 20 %. |
+| **Indice de sensibilité territoriale** | Score expert de sensibilité du territoire, calculé en combinant les facteurs naturels et humains. C’est un score, pas une probabilité de feu. |
+| **Caractéristiques du milieu naturel** | Sous-score 0–100 : résineux 40 %, forêt 25 %, lisières 15 %, pente 10 %, pins 10 %. |
+| **Facteurs d’influence humaine** | Sous-score 0–100 : habitat à moins de 200 m de la forêt (WUI) 40 %, routes pondérées 25 %, trafic 20 %, agriculture 15 %. |
 
 ### Score expert
 

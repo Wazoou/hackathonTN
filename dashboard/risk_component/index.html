@@ -49,6 +49,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visi
 h2.panel-title{margin:0;color:var(--navy);font-size:17px;font-weight:700;line-height:1.3}
 fieldset{margin:0;padding:0;border:0;min-width:0}
 legend,label.block{display:block;font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:8px}
+#layers fieldset+fieldset{margin-top:12px}
 label.choice{display:flex;align-items:center;gap:9px;padding:7px 10px;margin:0 0 4px;border:1px solid transparent;border-radius:var(--radius);cursor:pointer;font-size:13.5px}
 label.choice:hover{background:var(--surface-alt)}
 label.choice:has(input:checked){background:var(--accent-soft);border-color:#b9d4ea;color:var(--accent-strong);font-weight:600}
@@ -102,10 +103,13 @@ table{width:100%;border-collapse:collapse;font-size:12px}td,th{padding:9px 7px;t
 <section id="department-details" aria-label="Fiche du département" hidden>
 <div id="department-summary" aria-live="polite"></div>
 </section>
-<fieldset id="layers" disabled><legend>Couche affichée</legend></fieldset>
+<div id="layers" class="layer-groups">
+<fieldset id="evaluation-layers" disabled></fieldset>
+<fieldset id="descriptive-layers" disabled></fieldset>
+</div>
 <details class="advanced"><summary>Réglages avancés du score expert</summary>
 <fieldset id="modes" disabled><legend>Combinaison</legend><label class="choice"><input type="radio" name="mode" value="multiplicatif" checked>Multiplicatif</label><label class="choice"><input type="radio" name="mode" value="additif">Additif</label></fieldset>
-<fieldset><label class="block" for="weight">Poids du combustible <output id="weight-value">60 %</output></label><input id="weight" type="range" min="0" max="20" step="1" value="12" disabled><p class="muted hint">Actif en mode additif avec la couche « Score de risque » ; le reste correspond à la pression humaine.</p></fieldset>
+<fieldset><label class="block" for="weight">Poids du combustible <output id="weight-value">60 %</output></label><input id="weight" type="range" min="0" max="20" step="1" value="12" disabled><p class="muted hint">Actif en mode additif avec la couche « Indice de sensibilité territoriale » ; le reste correspond à la pression humaine.</p></fieldset>
 </details>
 </aside></div>
 <details id="daily-series" class="card" hidden><summary>Risque et feux déclarés autour de cette date</summary><div class="chart-legend"><span>Communes avec feu attendues (modèle)</span><span>Feux BDIFF déclarés</span></div><svg id="daily-chart" viewBox="0 0 1000 240" role="img" aria-label="Risque et feux observés autour de la date sélectionnée"></svg><p id="daily-validation" class="muted"></p></details>

@@ -19,7 +19,7 @@ vm.runInContext(fs.readFileSync('dashboard/risk_component/app.js','utf8'),contex
 const run=code=>vm.runInContext(code,context);
 const advance=ms=>{now+=ms;const callbacks=[...frames.values()];frames.clear();callbacks.forEach(fn=>fn(now));};
 run(`
- dataset={department_names:{'33':'Gironde','40':'Landes'},layers:{score:'Score de risque (expert)',p_feu:'Probabilité annuelle de départ (BDIFF)'}};
+ dataset={department_names:{'33':'Gironde','40':'Landes'},layers:{score:'Indice de sensibilité territoriale',p_feu:'Probabilité annuelle d’incendie'}};
  stats=()=>({high:.152});
  dataset.fire_history={years:Array.from({length:19},(_,i)=>2006+i),complete:true,departments:{'33':{annual_mean:100.5}}};
  rows=new Map([['33',[]],['40',[]]]);

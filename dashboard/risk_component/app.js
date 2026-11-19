@@ -237,6 +237,25 @@ function controls(){
  $('modes').disabled=state.layer!=='score';$('weight').disabled=state.layer!=='score'||state.mode!=='additif';
  $('weight-value').textContent=`${state.weight*5} %`;
 }
+function explanationHTML(){
+ const e=R.escape;
+ if(state.layer==='p_jour'){
+  const date=daily.label.split('-').reverse().join('/');
+  const weather=daily.kind==='observed'?'observations météorologiques des stations Météo-France':
+   daily.kind==='forecast'?'prévisions météorologiques issues d’Open-Meteo':
+   daily.kind==='live'?'météo modélisée issue d’Open-Meteo':'données historiques modélisées issues d’Open-Meteo';
+  return `<strong>Évaluation du risque journalier du ${e(date)} :</strong> caractéristiques du territoire (agriculture, forêt, habitat, réseau routier et relief) et ${weather}. `+
+   `${daily.fires.length?'Ronds blancs : feux BDIFF déclarés. ':''}`+
+   `${daily.kind==='live'?' Estimation pour toute la journée, révisée toutes les 1 h 30.':daily.kind==='forecast'?' Prévision expérimentale : incertitude croissante avec l’échéance.':''}`;
+ }
+ if(state.layer==='p_feu')
+  return '<strong>Probabilité annuelle d’incendie :</strong> probabilité estimée à partir des feux historiques BDIFF et des caractéristiques du territoire : facteurs naturels (forêt, résineux, lisières, pente et pins) et facteurs humains (habitat proche de la végétation, routes, trafic routier et agriculture).';
+ if(state.layer==='s_combustible')
+  return 'Sous-score combustible et relief, calculé à partir des résineux, de la forêt, des lisières, de la pente et des pins.';
+ if(state.layer==='s_humain')
+  return 'Sous-score de pression humaine, calculé à partir de l’habitat proche de la végétation, des routes, du trafic routier et de l’agriculture.';
+ return '<strong>Indice de sensibilité territoriale :</strong> score expert de sensibilité du territoire, calculé en combinant les facteurs naturels (forêt, résineux, lisières, pente et pins) et les facteurs humains (habitat proche de la végétation, routes, trafic routier et agriculture). C’est un score, pas une probabilité de feu.';
+}
 function update(kind='layer'){
  if(!dataset||!map)return;
  const start=performance.now();
@@ -249,8 +268,7 @@ function update(kind='layer'){
   const span=document.createElement('span'),swatch=document.createElement('i');swatch.style.background=`rgb(${rgb})`;
   span.append(swatch,document.createTextNode(`${name} (${high?low+'–'+high:'≥ '+low})`));$('legend').append(span);
  }
- $('explanation').textContent=state.layer==='p_jour'?`Risque journalier du ${daily.label}, pour 10 000 : terrain et ${daily.kind==='observed'?'météo des stations Météo-France':daily.kind==='forecast'?'prévisions météo Open-Meteo':'météo modélisée Open-Meteo'}. ${daily.fires.length?'Ronds blancs : feux BDIFF déclarés. ':''}Les probabilités communales sont réparties entre les mailles.${daily.kind==='live'?' Estimation pour toute la journée, révisée toutes les 1 h 30.':daily.kind==='forecast'?' Prévision expérimentale : incertitude croissante avec l’échéance.':''}`:state.layer==='p_feu'?''
-  :'Indice de sensibilité du terrain, relatif aux départements calculés ensemble. Végétation, relief et pression humaine ; sans météo, ce score n’est pas une probabilité.';
+ $('explanation').innerHTML=explanationHTML();
  updateDepartmentDetails();
  if(kind==='department'){
   fit();
@@ -262,10 +280,21 @@ function update(kind='layer'){
  try{sessionStorage.setItem('risk-controls',JSON.stringify(state));}catch{}
 }
 function renderLayerControls(){
- $('layers').innerHTML='<legend>Couche affichée</legend>';
- for(const [v,label] of Object.entries(dataset.layers)){
-  const l=document.createElement('label');l.className='choice';const input=document.createElement('input');input.type='radio';input.name='layer';input.value=v;input.checked=v===state.layer;
-  input.onchange=()=>{state.layer=v;update('layer');};l.append(input,document.createTextNode(label));$('layers').append(l);
+ const groups=[
+  {id:'evaluation-layers',title:'Couches d’évaluation des risques',keys:['p_jour','p_feu','score']},
+  {id:'descriptive-layers',title:'Couches descriptives du territoire',keys:['s_combustible','s_humain']},
+ ];
+ for(const group of groups){
+  const fieldset=$(group.id);
+  fieldset.replaceChildren();
+  const legend=document.createElement('legend');legend.textContent=group.title;fieldset.append(legend);
+  for(const key of group.keys){
+   const label=dataset.layers[key];
+   if(!label)continue;
+   const choice=document.createElement('label');choice.className='choice';
+   const input=document.createElement('input');input.type='radio';input.name='layer';input.value=key;input.checked=key===state.layer;
+   input.onchange=()=>{state.layer=key;update('layer');};choice.append(input,document.createTextNode(label));fieldset.append(choice);
+  }
  }
 }
 // Risque du jour : seules les valeurs changent d'une date à l'autre (Float32, base64), jamais les géométries.
@@ -322,7 +351,7 @@ function initialize(data){
  if(!['multiplicatif','additif'].includes(state.mode))state.mode='multiplicatif';
  state.weight=Math.max(0,Math.min(20,Math.round(Number(state.weight)||0)));
  renderLayerControls();
- $('layers').disabled=false;$('weight').value=state.weight;
+ $('evaluation-layers').disabled=false;$('descriptive-layers').disabled=false;$('weight').value=state.weight;
  document.querySelectorAll('input[name=mode]').forEach(el=>{el.checked=el.value===state.mode;el.onchange=()=>{state.mode=el.value;update('mode');};});
  filterExtension=new deck.DataFilterExtension({filterSize:1});
  const initial=viewBounds(bounds.get(state.dept));
